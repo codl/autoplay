@@ -105,13 +105,14 @@ while True:
   while len(client.playlist()) < trigger:
     addsong()
 
-  time=client.status()['time'].split(":")
-  pos=int(time[0])
-  end=int(time[1])
-  if armed==1 and (end > 15) and (pos > 3.0/4*end):
-    armed=0
-    listened(unicode(client.currentsong()["file"]))
-    songid=(client.currentsong()["id"])
+  if not client.status()['state'] == "stop":
+    time=client.status()['time'].split(":")
+    pos=int(time[0])
+    end=int(time[1])
+    if armed==1 and (end > 15) and (pos > 3.0/4*end):
+      armed=0
+      listened(unicode(client.currentsong()["file"]))
+      songid=(client.currentsong()["id"])
 
   if armed==0 and not songid == client.currentsong()["id"]: 
     armed=1
