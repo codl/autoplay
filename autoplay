@@ -4,27 +4,37 @@
 # Banana banana banana.
 #
 # Dependencies : python-mpd
+#                pysqlite
 
 import sys
 import mpd
-from time import sleep as sleep
 import random
+import sqlite3
+from time import sleep as sleep
 from socket import error as socketerror
 
-## Settings
+## Config
 server="192.168.0.2"
 port=6600
-trigger=5  # A new song will be added when the playlist
-           # has less songs than this
-delay=1
+trigger=10 # A new song will be added when the playlist
+          # has less songs than this
+delay=0.2
+dbfile="/tmp/autoplay"
+## End config
 
+db = sqlite3.connect(dbfile)
+cursor = db.cursor()
+
+random.seed()
 client = mpd.MPDClient()
 
+## Functions
+
 def reconnect(iter=0):
+  print "Reconnecting"
   if iter==10:
     print "Connection lost"
     exit(1)
-
   try:
     client.connect(server, port)
   except socketerror:
@@ -32,20 +42,54 @@ def reconnect(iter=0):
 
 
 def addsong():
-  random.seed()
-  try:
-    songlist=client.list('file')
-  except socketerror:
-    reconnect()
-  client.add(random.choice(songlist))
+  songlist=client.list('file')
+  song=random.choice(songlist)
+  previous=getsong(song)[2]
+  cursor.execute("update songs set added=? where file=?", (previous+1, song,))
+  db.commit()
+  client.add(song)
+
+def getsong(song):
+  data=cursor.execute("select * from songs where file=?", (song,)).fetchone()
+  if data == None:
+    cursor.execute("insert into songs values (?, 0, 0)", (song,))
+  data = (song, 0, 0)
+  return data
+
+def songkarma(song):
+  data=getsong(song)
+  if data[2]=0:
+    data[2]=0.01
+  karma=data[1]/data[2]
+  return karma
+
+def listened(song):
+  previous=getsong(song)[1]
+  cursor.execute("update songs set listened=? where file=?", (previous+1, song,))
+  db.commit()
+
+## End functions
 
 try:
   client.connect(server, port)
 except socketerror:
   reconnect()
 
+armed=1
+
 while True:
   while len(client.playlist()) < trigger:
     addsong()
 
+  time=client.status()['time'].split(":")
+  pos=int(time[0])
+  end=int(time[1])
+  if armed==1 and (end > 15) and (pos > 3.0/4*end):
+    armed=0
+    listened(client.currentsong()["file"])
+    songid=(client.currentsong()["id"])
+
+  if armed==0 and not songid == client.currentsong()["id"]: 
+    armed=1
+  
   sleep(delay)
