@@ -6,7 +6,7 @@
 # Dependencies : python-mpd
 #                pysqlite
 
-import sys
+import os.path
 import mpd
 import random
 import sqlite3
@@ -16,10 +16,10 @@ from socket import error as socketerror
 ## Config
 server="192.168.0.2"
 port=6600
-trigger=10 # A new song will be added when the playlist
-          # has less songs than this
-delay=0.2
-dbfile="/tmp/autoplay"
+trigger=5  # A new song will be added when the playlist
+           # has less songs than this
+delay=0.5
+dbfile="/tmp/autopl"
 ## End config
 
 db = sqlite3.connect(dbfile)
@@ -42,30 +42,46 @@ def reconnect(iter=0):
 
 
 def addsong():
-  songlist=client.list('file')
-  song=random.choice(songlist)
-  previous=getsong(song)[2]
-  cursor.execute("update songs set added=? where file=?", (previous+1, song,))
-  db.commit()
-  client.add(song)
+  rand=random.uniform(-0.1, 1)
+  print rand # DEBUG
+  data=cursor.execute("select * from songs where karma > ?", (rand,)).fetchall()
+  if data == None:
+    addsong()
+  else:
+    songdata=random.choice(data)
+    print songdata[3] # DEBUG
+    newkarma=karma(songdata, 2)
+    cursor.execute("update songs set added=?, karma=? where file=?", (songdata[2]+1, newkarma, songdata[0],))
+    db.commit()
+    client.add(songdata[0])
 
 def getsong(song):
   data=cursor.execute("select * from songs where file=?", (song,)).fetchone()
   if data == None:
-    cursor.execute("insert into songs values (?, 0, 0)", (song,))
+    cursor.execute("insert into songs values (?, 0, 0, 0.5)", (song,))
   data = (song, 0, 0)
   return data
 
-def songkarma(song):
-  data=getsong(song)
-  if data[2]=0:
-    data[2]=0.01
-  karma=data[1]/data[2]
-  return karma
+def karma(songdata, which=0):
+  listened=float(songdata[1])
+  added=float(songdata[2])
+
+  if which == 1:
+    listened+=1
+  elif which == 2:
+    added+=1
+
+  if listened==0:
+    listened=0.01
+  if added==0:
+    added=0.01
+  print listened, added, listened/added # DEBUG
+  return listened/added
 
 def listened(song):
-  previous=getsong(song)[1]
-  cursor.execute("update songs set listened=? where file=?", (previous+1, song,))
+  songdata=getsong(song)
+  newkarma=karma(songdata, 1)
+  cursor.execute("update songs set listened=?, karma=? where file=?", (songdata[1]+1, newkarma, song,))
   db.commit()
 
 ## End functions
@@ -75,6 +91,14 @@ try:
 except socketerror:
   reconnect()
 
+## Startup
+cursor.execute("create table if not exists songs(file text, listened int, added int, karma real);")
+print "Verifying database..."
+for song in client.list("file"):
+  nothing=getsong(song)
+
+db.commit()
+print "Done"
 armed=1
 
 while True:
@@ -86,7 +110,7 @@ while True:
   end=int(time[1])
   if armed==1 and (end > 15) and (pos > 3.0/4*end):
     armed=0
-    listened(client.currentsong()["file"])
+    listened(unicode(client.currentsong()["file"]))
     songid=(client.currentsong()["id"])
 
   if armed==0 and not songid == client.currentsong()["id"]: 
