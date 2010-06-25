@@ -1,0 +1,51 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+#
+# Banana banana banana.
+#
+# Dependencies : python-mpd
+
+import sys
+import mpd
+from time import sleep as sleep
+import random
+from socket import error as socketerror
+
+## Settings
+server="192.168.0.2"
+port=6600
+trigger=5  # A new song will be added when the playlist
+           # has less songs than this
+delay=1
+
+client = mpd.MPDClient()
+
+def reconnect(iter=0):
+  if iter==10:
+    print "Connection lost"
+    exit(1)
+
+  try:
+    client.connect(server, port)
+  except socketerror:
+    reconnect(iter+1)
+
+
+def addsong():
+  random.seed()
+  try:
+    songlist=client.list('file')
+  except socketerror:
+    reconnect()
+  client.add(random.choice(songlist))
+
+try:
+  client.connect(server, port)
+except socketerror:
+  reconnect()
+
+while True:
+  while len(client.playlist()) < trigger:
+    addsong()
+
+  sleep(delay)
