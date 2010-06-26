@@ -104,7 +104,7 @@ while True:
   while len(client.playlist()) < trigger:
     addsong()
 
-  if not client.status()['state'] == "stop":
+  if client.status()['state'] == "play":
     time=client.status()['time'].split(":")
     pos=int(time[0])
     end=int(time[1])
