@@ -43,7 +43,7 @@ def reconnect(iter=0):
 
 def addsong():
   rand=random.uniform(-0.1, 1)
-  cursor.execute("select * from songs where karma > ?", (karma,))
+  cursor.execute("select * from songs where karma>?", (rand,))
   data=cursor.fetchall()
   if data == None:
     addsong()
@@ -72,9 +72,9 @@ def karma(songdata, which=0):
     added+=1
 
   if listened==0:
-    listened=0.01
+    listened=0.5
   if added==0:
-    added=0.01
+    added=0.5
   return listened/added
 
 def listened(song):
@@ -94,7 +94,7 @@ except socketerror:
 cursor.execute("create table if not exists songs(file text, listened int, added int, karma real);")
 print "Verifying database..."
 for song in client.list("file"):
-  nothing=getsong(unicode(song))
+  nothing=getsong(unicode(song, "utf-8"))
 
 db.commit()
 print "Done"
@@ -110,7 +110,7 @@ while True:
     end=int(time[1])
     if armed==1 and (end > 15) and (pos > 3.0/4*end):
       armed=0
-      listened(unicode(client.currentsong()["file"]))
+      listened(unicode(client.currentsong()["file"], "utf-8"))
       songid=(client.currentsong()["id"])
 
   if armed==0 and not songid == client.currentsong()["id"]: 
