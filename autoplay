@@ -14,16 +14,16 @@ import time
 from socket import error as socketerror
 
 ## Config
-server="192.168.0.2"
+server="127.0.0.1"
 port=6600
-trigger=5  # A new song will be added when the playlist
+trigger=8  # A new song will be added when the playlist
            # has less songs than this
 delay=0.8
-dbfile="/tmp/autodb"
-flood_delay=40
+dbfile="~/music/.autodb"
+flood_delay=12*60 # Minutes to wait before adding the same song again
 ## End config
 
-db = sqlite3.connect(dbfile)
+db = sqlite3.connect(os.path.expanduser(dbfile))
 cursor = db.cursor()
 
 random.seed()
@@ -44,7 +44,7 @@ def reconnect(iter=0):
 
 def addsong():
   rand=random.uniform(-0.1, 1)
-  cursor.execute("select * from songs where karma>? and time < ?", (rand, time.time()-(60*flood_delay)))
+  cursor.execute("select * from songs where karma>? and time < ?", (rand, time.time()-(60*(flood_delay-trigger*3))))
   data=cursor.fetchall()
   if data == []:
     addsong()
