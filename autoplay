@@ -19,7 +19,8 @@ port=6600
 trigger=5  # A new song will be added when the playlist
            # has less songs than this
 delay=0.8
-dbfile="/tmp/autopl"
+dbfile="/tmp/autodb"
+flood_delay=40
 ## End config
 
 db = sqlite3.connect(dbfile)
@@ -43,7 +44,7 @@ def reconnect(iter=0):
 
 def addsong():
   rand=random.uniform(-0.1, 1)
-  cursor.execute("select * from songs where karma>? and time < ?", (rand, time.time()-(60*15)))
+  cursor.execute("select * from songs where karma>? and time < ?", (rand, time.time()-(60*flood_delay)))
   data=cursor.fetchall()
   if data == []:
     addsong()
@@ -92,7 +93,7 @@ except socketerror:
 
 ## Startup
 cursor.execute("create table if not exists songs(file text, listened int, added int, karma real, time numeric);")
-print "Verifying database..."
+print "Updating database..."
 for song in client.list("file"):
   nothing=getsong(unicode(song, "utf-8"))
 db.commit()
