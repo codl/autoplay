@@ -6,21 +6,17 @@
 
 case "$1" in
     start)
-  su codl -c "/home/codl/bin/autoplay"
-	if [ $? -gt 0 ]; then
-		stat_fail
-	else
-		stat_done
-	fi
+	stat_busy "Starting Autoplay"
+  su codl -c "/home/codl/bin/autoplay" > /dev/null &
+  stat_done
         ;;
     stop)
-	stat_busy "Stopping Hardware Abstraction Layer"
-  for i in $(ps -Ao pid,args | grep autoplay | cut -d' ' -f1); do kill $i; done
+	stat_busy "Stopping Autoplay"
+  for i in $(ps -Ao pid,args | grep autoplay | grep python | cut -d' ' -f1); do kill $i; done
 	stat_done
 	;;
     restart)
         $0 stop
-	sleep 1
         $0 start
         ;;
     *)
