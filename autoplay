@@ -44,14 +44,14 @@ def reconnect(iter=0):
 
 def addsong():
   rand=random.uniform(-0.1, 1)
-  cursor.execute("select * from songs where karma>? and time < ?", (rand, time.time()-(60*(flood_delay-trigger*3))))
+  cursor.execute("select * from songs where karma>? and time < ?", (rand, int(time.time()-(60*(flood_delay-trigger*3)))))
   data=cursor.fetchall()
   if data == []:
     addsong()
   else:
     songdata=random.choice(data)
     newkarma=karma(songdata, 2)
-    cursor.execute("update songs set added=?, karma=?, time=? where file=?", (songdata[2]+1, newkarma, time.time(), songdata[0],))
+    cursor.execute("update songs set added=?, karma=?, time=? where file=?", (songdata[2]+1, newkarma, int(time.time()), songdata[0],))
     db.commit()
     client.add(songdata[0])
 
@@ -81,7 +81,7 @@ def karma(songdata, which=0):
 def listened(song):
   songdata=getsong(song)
   newkarma=karma(songdata, 1)
-  cursor.execute("update songs set listened=?, karma=?, time=? where file=?", (songdata[1]+1, newkarma, time.time(), song))
+  cursor.execute("update songs set listened=?, karma=?, time=? where file=?", (songdata[1]+1, newkarma, int(time.time()), song))
   db.commit()
 
 ## End functions
@@ -92,7 +92,7 @@ except socketerror:
   reconnect()
 
 ## Startup
-cursor.execute("create table if not exists songs(file text, listened int, added int, karma real, time numeric);")
+cursor.execute("create table if not exists songs(file text, listened int, added int, karma real, time int);")
 print "Updating database..."
 for song in client.list("file"):
   nothing=getsong(unicode(song, "utf-8"))
