@@ -10,7 +10,7 @@ import os.path
 import mpd
 import random
 import sqlite3
-from time import sleep as sleep
+import time
 from socket import error as socketerror
 
 ## Config
@@ -18,7 +18,7 @@ server="192.168.0.2"
 port=6600
 trigger=5  # A new song will be added when the playlist
            # has less songs than this
-delay=0.5
+delay=0.8
 dbfile="/tmp/autopl"
 ## End config
 
@@ -43,14 +43,14 @@ def reconnect(iter=0):
 
 def addsong():
   rand=random.uniform(-0.1, 1)
-  cursor.execute("select * from songs where karma>?", (rand,))
+  cursor.execute("select * from songs where karma>? and time < ?", (rand, time.time()-(60*15)))
   data=cursor.fetchall()
-  if data == None:
+  if data == []:
     addsong()
   else:
     songdata=random.choice(data)
     newkarma=karma(songdata, 2)
-    cursor.execute("update songs set added=?, karma=? where file=?", (songdata[2]+1, newkarma, songdata[0],))
+    cursor.execute("update songs set added=?, karma=?, time=? where file=?", (songdata[2]+1, newkarma, time.time(), songdata[0],))
     db.commit()
     client.add(songdata[0])
 
@@ -58,7 +58,7 @@ def getsong(song):
   cursor.execute("select * from songs where file=?", (song,))
   data=cursor.fetchone()
   if data == None:
-    cursor.execute("insert into songs values (?, 0, 0, 0.5)", (song,))
+    cursor.execute("insert into songs values (?, 0, 0, 0.5, 0)", (song,))
     data = (song, 0, 0)
   return data
 
@@ -72,15 +72,15 @@ def karma(songdata, which=0):
     added+=1
 
   if listened==0:
-    listened=0.5
+    listened=0.1
   if added==0:
-    added=0.5
+    added=0.1
   return listened/added
 
 def listened(song):
   songdata=getsong(song)
   newkarma=karma(songdata, 1)
-  cursor.execute("update songs set listened=?, karma=? where file=?", (songdata[1]+1, newkarma, song,))
+  cursor.execute("update songs set listened=?, karma=?, time=? where file=?", (songdata[1]+1, newkarma, time.time(), song))
   db.commit()
 
 ## End functions
@@ -91,11 +91,10 @@ except socketerror:
   reconnect()
 
 ## Startup
-cursor.execute("create table if not exists songs(file text, listened int, added int, karma real);")
+cursor.execute("create table if not exists songs(file text, listened int, added int, karma real, time numeric);")
 print "Verifying database..."
 for song in client.list("file"):
   nothing=getsong(unicode(song, "utf-8"))
-
 db.commit()
 print "Done"
 armed=1
@@ -105,9 +104,9 @@ while True:
     addsong()
 
   if client.status()['state'] == "play":
-    time=client.status()['time'].split(":")
-    pos=int(time[0])
-    end=int(time[1])
+    times=client.status()['time'].split(":")
+    pos=int(times[0])
+    end=int(times[1])
     if armed==1 and (end > 15) and (pos > 3.0/4*end):
       armed=0
       listened(unicode(client.currentsong()["file"], "utf-8"))
@@ -116,4 +115,4 @@ while True:
   if armed==0 and not songid == client.currentsong()["id"]: 
     armed=1
   
-  sleep(delay)
+  time.sleep(delay)
