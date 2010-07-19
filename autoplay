@@ -43,7 +43,7 @@ def reconnect(iter=0):
 
 
 def addsong():
-  rand=random.uniform(-0.1, 1)
+  rand=random.uniform(-0.1, 1.5)
   cursor.execute("select * from songs where karma>? and time < ?", (rand, int(time.time()-(60*(flood_delay-trigger*3)))))
   data=cursor.fetchall()
   if data == []:
@@ -94,12 +94,20 @@ except socketerror:
 ## Startup
 cursor.execute("create table if not exists songs(file text, listened int, added int, karma real, time int);")
 print "Updating database..."
+stale=[]
+for song in cursor.execute("select file from songs"):
+  if not os.path.isfile("/home/codl/music/" + song[0]):
+    stale.append(song[0])
+for song in stale:
+  cursor.execute("delete from songs where file=?", (song,))
+db.commit()
 for song in client.list("file"):
   nothing=getsong(unicode(song, "utf-8"))
 db.commit()
 print "Done"
 armed=1
 
+ur="""
 while True:
   while len(client.playlist()) < trigger:
     addsong()
@@ -108,7 +116,7 @@ while True:
     times=client.status()['time'].split(":")
     pos=int(times[0])
     end=int(times[1])
-    if armed==1 and (end > 15) and (pos > 3.0/4*end):
+    if armed==1 and (end > 25) and (pos > 3.0/4*end):
       armed=0
       listened(unicode(client.currentsong()["file"], "utf-8"))
       songid=(client.currentsong()["id"])
@@ -117,3 +125,4 @@ while True:
     armed=1
   
   time.sleep(delay)
+"""
