@@ -16,9 +16,15 @@ from socket import error as socketerror
 ## Config
 server="127.0.0.1"
 port=6600
-trigger=8  # A new song will be added when the playlist
-           # has less songs than this
-delay=0.8
+trigger=8 # A new song will be added when the playlist
+          #  has less songs than this
+delay=0.8 # Make this higher if hogging cpu (not likely) 
+playtime=70 # Percentage of a song that must be played before
+            #  play count is incremented
+mintime=25 # A song must be longer than mintime seconds for
+             # its playcount to be incremented. This way, samples
+             # and other short bonus tracks' karma will quickly dive
+             # and the songs will seldom be added.
 dbfile="~/music/.autodb"
 flood_delay=12*60 # Minutes to wait before adding the same song again
 ## End config
@@ -115,8 +121,8 @@ while True:
     times=client.status()['time'].split(":")
     pos=int(times[0])
     end=int(times[1])
-    if armed==1 and (end > 25) and (pos > 3.0/4*end):
-      armed=0
+    if armed==1 and (end > mintime) and (pos > playtime*end/100):
+      armed=0 # Disarm until the next song
       listened(unicode(client.currentsong()["file"], "utf-8"))
       songid=(client.currentsong()["id"])
 
