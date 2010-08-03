@@ -92,8 +92,8 @@ except socketerror:
   reconnect()
 
 ## Startup
-cursor.execute("create table if not exists songs(file text, listened int, added int, karma real, time int);")
 print "Updating database..."
+cursor.execute("create table if not exists songs(file text, listened int, added int, karma real, time int);")
 stale=[]
 for song in cursor.execute("select file from songs"):
   if not os.path.isfile("/home/codl/music/" + song[0]):
@@ -107,7 +107,6 @@ db.commit()
 print "Done"
 armed=1
 
-ur="""
 while True:
   while len(client.playlist()) < trigger:
     addsong()
@@ -125,4 +124,3 @@ while True:
     armed=1
   
   time.sleep(delay)
-"""
