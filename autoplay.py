@@ -16,6 +16,7 @@ from socket import error as socketerror
 ## Config
 server="127.0.0.1"
 port=6600
+password=False # Set to False if none
 trigger=8 # A new song will be added when the playlist
           #  has less songs than this
 delay=0.8 # Make this higher if hogging cpu (not likely) 
@@ -96,6 +97,9 @@ try:
   client.connect(server, port)
 except socketerror:
   reconnect()
+
+if password:
+  client.password(password)
 
 ## Startup
 print "Updating database..."
