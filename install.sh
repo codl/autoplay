@@ -13,21 +13,29 @@ fi
 cp autoplay.py /tmp/autoplay
 cp rc /tmp/rc
 
-printf "MPD server?\n(Default : localhost) > "
-read SERVER
-[[ $SERVER != "" ]] && sed -i "s/localhost/$SERVER/" /tmp/autoplay
+if [[ $(sed -n "/localhost/p" /tmp/autoplay) != '' ]]; then
+  printf "MPD server?\n(Default : localhost) > "
+  read SERVER
+  [[ $SERVER != "" ]] && sed -i "s/localhost/$SERVER/" /tmp/autoplay
+fi
 
-printf "MPD port?\n(Default : 6600) > "
-read PORT
-[[ $PORT != "" ]] && sed -i "/port/s/6600/$PORT/" /tmp/autoplay
+if [[ $(sed -n "/port.*6600/p" /tmp/autoplay) != '' ]]; then
+  printf "MPD port?\n(Default : 6600) > "
+  read PORT
+  [[ $PORT != "" ]] && sed -i "/port/s/6600/$PORT/" /tmp/autoplay
+fi
 
-printf "MPD password?\n(Default : None) > "
-read PASS
-[[ $PASS != "" ]] && sed -i "/pass/s/False/$PASS/1" /tmp/autoplay
+if [[ $(sed -n "/pass.*False.*#/p" /tmp/autoplay) != '' ]]; then
+  printf "MPD password?\n(Default : None) > "
+  read PASS
+  [[ $PASS != "" ]] && sed -i "/pass/s/False/$PASS/1" /tmp/autoplay
+fi
 
-printf "Where should the DB go?\n(Default : ~/music) > "
-read DB
-[[ $DB != "" ]] && sed -i "s|~/music|$DB|" /tmp/autoplay
+if [[ $(sed -n "/\~\/music/p" /tmp/autoplay) != '' ]]; then
+  printf "Where should the DB go?\n(Default : ~/music) > "
+  read DB
+  [[ $DB != "" ]] && sed -i "s|~/music|$DB|" /tmp/autoplay
+fi
 
 printf "Where to install?\n(Default : /usr/bin) > "
 read BIN
@@ -36,7 +44,7 @@ read BIN
 
 mv /tmp/autoplay $BIN/autoplay
 
-printf "Where is your rc.d or init.d directory?\n(Default : /etc/rc.d or /etc/init.d) > "
+printf "Where is your rc.d or init.d directory?\n(Default : /etc/rc.d, /etc/init.d, or none) > "
 read DOTD
 [[ $DOTD == "" ]] && [[ -d /etc/rc.d ]] && DOTD="/etc/rc.d"
 [[ $DOTD == "" ]] && [[ -d /etc/init.d ]] && DOTD="/etc/init.d"
@@ -48,4 +56,4 @@ if [[ $DOTD != "" ]]; then
   [[ $REPLY == "y" ]] || [[ $REPLY == "yes" ]] || [[ $REPLY == "Y" ]] || [[ $REPLY == "Yes" ]] || [[ $REPLY == "YES" ]] && $DOTD/autoplay start
 fi
 
-echo "Done! :)"
+echo "Done! Autoplay has been installed to $BIN/autoplay :)"
