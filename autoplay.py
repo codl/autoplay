@@ -11,24 +11,30 @@ import mpd
 import random
 import sqlite3
 import time
+import io
 from socket import error as socketerror
 
-## Config
+##/ Config
+#/
 server="127.0.0.1"
 port=6600
 password=False # Set to False if none
+dbfile="~/music/.autodb"
 trigger=8 # A new song will be added when the playlist
           #  has less songs than this
-delay=0.8 # Make this higher if hogging cpu (not likely) 
+          #  You can set this to 0 if you only want the stats
 playtime=70 # Percentage of a song that must be played before
             #  play count is incremented
-mintime=25 # A song must be longer than mintime seconds for
-             # its playcount to be incremented. This way, samples
-             # and other short bonus tracks' karma will quickly dive
-             # and the songs will seldom be added.
-dbfile="~/music/.autodb"
+mintime=25 # Minimum length of a track for it
+           #  to be considered a song
 flood_delay=12*60 # Minutes to wait before adding the same song again
-## End config
+delay=0.8 # Make this higher if hogging cpu (not likely) 
+retry=3 # Retry connecting this many times
+
+debug=False
+logfile="/tmp/autoplay.log"
+#\
+##\
 
 db = sqlite3.connect(os.path.expanduser(dbfile))
 cursor = db.cursor()
@@ -36,13 +42,20 @@ cursor = db.cursor()
 random.seed()
 client = mpd.MPDClient()
 
-## Functions
+logio=io.open(logfile, "at", buffering=1)
+logio.write(unicode("\n\nStarted "+str(time.time())+"\n"))
 
-def reconnect(iter=0):
-  print "Reconnecting"
-  if iter==10:
-    print "Connection lost"
+## Functions
+def log(msg):
+  if debug:
+    print msg
+  logio.write(unicode(msg+"\n"))
+
+def reconnect(iter=1):
+  if iter==retry:
+    print "Could not connect to server :("
     exit(1)
+  log("Tried "+iter+" times")
   try:
     client.connect(server, port)
   except socketerror:
@@ -56,10 +69,11 @@ def addsong():
   if data == []:
     addsong()
   else:
-    songdata=random.choice(data)
+    songdata=getsong(random.choice(data)[0])
     newkarma=karma(songdata, 2)
     cursor.execute("update songs set added=?, karma=?, time=? where file=?", (songdata[2]+1, newkarma, int(time.time()), songdata[0],))
     db.commit()
+    log("Adding song "+songdata[-1]+" - Karma = "+str(songdata[3])+" - Karma limit = "+str(rand))
     client.add(songdata[0])
 
 def getsong(song):
@@ -68,6 +82,7 @@ def getsong(song):
   if data == None:
     cursor.execute("insert into songs values (?, 0, 0, 0.5, 0)", (song,))
     data = (song, 0, 0)
+  data = data + (data[0].split("/")[-1],)
   return data
 
 def karma(songdata, which=0):
@@ -89,10 +104,12 @@ def listened(song):
   songdata=getsong(song)
   newkarma=karma(songdata, 1)
   cursor.execute("update songs set listened=?, karma=?, time=? where file=?", (songdata[1]+1, newkarma, int(time.time()), song))
+  log("Listened to "+songdata[-1]+" - Karma = "+str(newkarma)+" - Listens = "+str(songdata[1]+1))
   db.commit()
 
 ## End functions
 
+log("Connecting...")
 try:
   client.connect(server, port)
 except socketerror:
@@ -102,7 +119,7 @@ if password:
   client.password(password)
 
 ## Startup
-print "Updating database..."
+log( "Updating database..." )
 cursor.execute("create table if not exists songs(file text, listened int, added int, karma real, time int);")
 stale=[]
 for song in cursor.execute("select file from songs"):
@@ -114,7 +131,7 @@ db.commit()
 for song in client.list("file"):
   nothing=getsong(unicode(song, "utf-8"))
 db.commit()
-print "Done"
+log("OK! :)")
 armed=1
 
 while True:
