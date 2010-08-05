@@ -55,7 +55,7 @@ def reconnect(iter=1):
   if iter==retry:
     print "Could not connect to server :("
     exit(1)
-  log("Tried "+iter+" times")
+  log("Tried "+str(iter)+" times")
   try:
     client.connect(server, port)
   except socketerror:
