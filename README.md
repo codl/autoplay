@@ -19,7 +19,7 @@ Dependencies
 Usage
 -----
 
-Just start autoplay either by calling autoplay.py directly or using the rc.d script. It will start building statistics and continuously fill your playlist.
+Just start autoplay either by calling autoplay directly or using the rc script. It will start building statistics and continuously fill your playlist.
 
 How it works
 ------------
