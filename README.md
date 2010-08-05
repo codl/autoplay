@@ -16,11 +16,6 @@ Dependencies
 [pympd]: http://jatreuman.indefero.net/p/python-mpd/
 [pysqlite]: http://code.google.com/p/pysqlite/
 
-Setup
------
-
-Move `autoplay.py` to a suitable place such as `/usr/bin`. Edit the `server`, `port`, and `password` configuration variables in `autoplay.py` to match your setup, and set the `bin` variable in `rc.d` to whereever you put `autoplay.py`. You may want to rename `rc.d` and move it to your `/etc/rc.d` or `/etc/init.d` or whatever directory your startup scripts are in.
-
 Usage
 -----
 

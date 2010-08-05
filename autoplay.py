@@ -16,7 +16,7 @@ from socket import error as socketerror
 
 ##/ Config
 #/
-server="127.0.0.1"
+server="localhost"
 port=6600
 password=False # Set to False if none
 dbfile="~/music/.autodb"

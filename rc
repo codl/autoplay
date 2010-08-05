@@ -1,7 +1,6 @@
 #!/bin/bash
 
-user="codl"
-bin="/home/codl/bin/autoplay.py"
+bin="/usr/bin/autoplay"
 
 . /etc/rc.conf
 . /etc/rc.d/functions
@@ -9,7 +8,7 @@ bin="/home/codl/bin/autoplay.py"
 case "$1" in
     start)
 	stat_busy "Starting Autoplay"
-  su $user -c "$bin" > /dev/null &
+  $bin > /dev/null &
   stat_done
         ;;
     stop)
