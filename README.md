@@ -1,7 +1,7 @@
 autoplay
 ========
 
-... is a simple daemon for auto-filling your [MPD][] playlist with the music you like the most.
+... is a simple daemon that keeps your [MPD][] playlist filled with the music you like the most.
 
 [MPD]: http://mpd.wikia.com (Music Player Daemon)
 
