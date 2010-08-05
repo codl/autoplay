@@ -1,6 +1,7 @@
 #!/bin/bash
 
 bin="/usr/bin/autoplay"
+runas="mpd"
 
 . /etc/rc.conf
 . /etc/rc.d/functions
@@ -8,7 +9,7 @@ bin="/usr/bin/autoplay"
 case "$1" in
   start)
     stat_busy "Starting Autoplay"
-    $bin > /dev/null &
+    su $runas -c $bin > /dev/null &
     stat_done
   ;;
   stop)

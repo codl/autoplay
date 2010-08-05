@@ -13,6 +13,17 @@ fi
 cp autoplay.py /tmp/autoplay
 cp rc /tmp/rc
 
+printf "Where to install?\n(Default : /usr/bin) > "
+read BIN
+[[ $BIN != "" ]] && [[ -d $BIN ]] && sed -i "s|/usr/bin|$BIN|" /tmp/rc
+[[ $BIN == "" ]] || [[ ! -d $BIN ]] && BIN="/usr/bin"
+
+printf "What user should run it?\n(Default : mpd) > "
+read USER
+[[ $USER != "" ]] && sed -i "s/mpd/$USER/" /tmp/rc
+
+sed -i "s|~|$(su $USER -c 'printf $HOME')|" /tmp/rc
+
 if [[ $(sed -n "/localhost/p" /tmp/autoplay) != '' ]]; then
   printf "MPD server?\n(Default : localhost) > "
   read SERVER
@@ -37,11 +48,6 @@ if [[ $(sed -n "/\~\/music/p" /tmp/autoplay) != '' ]]; then
   [[ $DB != "" ]] && sed -i "s|~/music|$DB|" /tmp/autoplay
 fi
 
-printf "Where to install?\n(Default : /usr/bin) > "
-read BIN
-[[ $BIN != "" ]] && [[ -d $BIN ]] && sed -i "s|/usr/bin|$BIN|" /tmp/rc
-[[ $BIN == "" ]] || [[ ! -d $BIN ]] && BIN="/usr/bin"
-
 mv /tmp/autoplay $BIN/autoplay
 
 printf "Where is your rc.d or init.d directory?\n(Default : /etc/rc.d, /etc/init.d, or none) > "
@@ -51,7 +57,7 @@ read DOTD
 [[ $DOTD == "" ]] || [[ ! -d $DOTD ]] && printf "Could not find rc.d or init.d directory. rc script will not be installed\n" && DOTD=""
 if [[ $DOTD != "" ]]; then
   mv /tmp/rc $DOTD/autoplay
-  printf "Do you want to start autoplay right now?\ny/N >"
+  printf "Do you want to start autoplay right now?\ny/N > "
   read
   [[ $REPLY == "y" ]] || [[ $REPLY == "yes" ]] || [[ $REPLY == "Y" ]] || [[ $REPLY == "Yes" ]] || [[ $REPLY == "YES" ]] && $DOTD/autoplay start
 fi
