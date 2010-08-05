@@ -6,22 +6,21 @@ bin="/usr/bin/autoplay"
 . /etc/rc.d/functions
 
 case "$1" in
-    start)
-	stat_busy "Starting Autoplay"
-  $bin > /dev/null &
-  stat_done
-        ;;
-    stop)
-	stat_busy "Stopping Autoplay"
-  for i in $(ps -Ao pid,args | grep $bin | grep python | cut -d' ' -f1); do kill $i; done
-	stat_done
-	;;
-    restart)
-        $0 stop
-        $0 start
-        ;;
-    *)
-        echo "usage: $0 {start|stop|restart}"
+  start)
+    stat_busy "Starting Autoplay"
+    $bin > /dev/null &
+    stat_done
+  ;;
+  stop)
+    stat_busy "Stopping Autoplay"
+    for i in $(ps -Ao pid,args | grep "python2 $bin" | grep -v grep | cut -d' ' -f1); do kill $i; done
+    stat_done
+  restart)
+    $0 stop
+    $0 start
+  ;;
+  *)
+    echo "usage: $0 {start|stop|restart}"
 	;;
 esac
 exit 0

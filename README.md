@@ -1,7 +1,7 @@
 autoplay
 ========
 
-... is a simple daemon for auto-filling your [MPD][] playlist with the music you like the most.
+... is a simple daemon that keeps your [MPD][] playlist filled with the music you like the most.
 
 [MPD]: http://mpd.wikia.com (Music Player Daemon)
 
@@ -19,7 +19,10 @@ Dependencies
 Usage
 -----
 
-Just start autoplay either by calling autoplay directly or using the rc script. It will start building statistics and continuously fill your playlist.
+Run `sudo ./install.sh` to install and configure autoplay.
+(Note: If you change any configuration variables by editing `autoplay.py` before running `install.sh`, it won't ask you about these)
+
+Then, start autoplay either by calling autoplay directly or using the rc script. It will start building statistics and continuously fill your playlist.
 
 How it works
 ------------
@@ -28,4 +31,4 @@ Autoplay gives each song a *karma* rating based on how often it adds that song, 
 
 Usually, bad songs have karma under 0.25, *meh* songs have karma between 0.25 and 0.60, and good songs are over 0.60. A song that is often added by the user to the playlist will have a karma over 1.
 
-When a song is played, there is a *cooldown time* (default 6h) when autoplay cannot add it. This way, the same songs cannot be spammed over and over.
+When a song is played, there is a *cooldown time* (default 12h) when autoplay cannot add it. This way, the same songs cannot be spammed over and over.
