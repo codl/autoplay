@@ -14,7 +14,8 @@ case "$1" in
   ;;
   stop)
     stat_busy "Stopping Autoplay"
-    for i in $(ps -Ao pid,args | grep "python2 $bin" | grep -v grep | cut -d' ' -f1); do kill $i; done
+    for i in $(ps -Ao pid,args | grep "python2 $bin"\
+      | grep -v grep | cut -d' ' -f1); do kill $i; done
     stat_done
   ;;
   restart)
@@ -26,3 +27,5 @@ case "$1" in
 	;;
 esac
 exit 0
+
+# vim: tw=70 ts=2 sw=2
