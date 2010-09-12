@@ -29,7 +29,7 @@ mintime = 25 # Minimum length of a track for it
              #  to be considered a song
 flood_delay = 12*60 # Minutes to wait before adding the same song again
 delay = 0.8 # Make this higher if hogging cpu (not likely) 
-retry = 3 # Retry connecting this many times
+tries = 3 # Retry connecting this many times
 
 debug = False
 logfile = "/tmp/autoplay.log"
@@ -39,12 +39,12 @@ logfile = "/tmp/autoplay.log"
 def log(msg, stdout=False):
   """Logs to file, and optionally to stdout. Obvious enough"""
   if stdout or debug:
-    print msg
-  logio.write(unicode(msg+"\n"))
+    print str(msg)
+  logio.write(unicode(msg)+"\n")
 
 def reconnect(i=1):
-  if i == retry:
-    log("Could not connect to server :(", stdout=True)
+  if i == tries:
+    log("Could not connect to server D:", stdout=True)
     exit(1)
   log("Tried "+str(i)+" times")
   try:
@@ -61,14 +61,14 @@ def addsong():
   if data == []:
     addsong()
   else:
-    songdata = getsong(random.choice(data)[0])
+    songdata = random.choice(data)
     newkarma = karma(songdata, 2)
     cursor.execute(
         "update songs set added=?, karma=?, time=? where file=?",
         (songdata[2]+1, newkarma, int(time.time()), songdata[0],)
     )
     db.commit()
-    log("Adding song "+songdata[-1]+" - Karma = "+
+    log("Adding song "+songdata[0]+" - Karma = "+
         str(songdata[3])+" - Karma limit = "+str(rand))
     client.add(songdata[0])
 
@@ -78,8 +78,7 @@ def getsong(songfile):
   data = cursor.fetchone()
   if data == None:
     cursor.execute("insert into songs values (?, 0, 0, 0.5, 0)", (song,))
-    data = (song, 0, 0)
-  data = data + (data[0].split("/")[-1],)
+    data = (song, 0, 0, 0.5, 0)
   return data
 
 def karma(songdata, which=0):
@@ -97,14 +96,13 @@ def karma(songdata, which=0):
     added = 0.1
   return listened/added
 
-def listened(songfile):
-  songdata = getsong(songfile)
+def listened(songdata):
   newkarma = karma(songdata, 1)
   cursor.execute(
       "update songs set listened=?, karma=?, time=? where file=?",
-      (songdata[1]+1, newkarma, int(time.time()), song)
+      (songdata[1]+1, newkarma, int(time.time()), songdata[0])
   )
-  log("Listened to "+songdata[-1]+" - Karma = "+
+  log("Listened to "+songdata[0]+" - Karma = "+
       str(newkarma)+" - Listens = "+str(songdata[1]+1))
   db.commit()
 ## /Functions
@@ -133,7 +131,8 @@ if password:
 
 log("Updating database...")
 cursor.execute("create table if not exists songs(\
-    file text, listened int, added int, karma real, time int);")
+  file text, listened int, added int, karma real, time int\
+  );")
 stale = []
 for song in cursor.execute("select file from songs"):
   if not os.path.isfile("/home/codl/music/" + song[0]):
@@ -147,7 +146,7 @@ db.commit()
 log("OK! :)")
 armed = 1
 
-while True:
+while __name__ == "__main__":
   while len(client.playlist()) < trigger:
     addsong()
 
@@ -157,7 +156,7 @@ while True:
     end = int(times[1])
     if armed == 1 and (end > mintime) and (pos > playtime*end/100):
       armed = 0 # Disarm until the next song
-      listened(unicode(client.currentsong()["file"], "utf-8"))
+      listened(getsong(unicode(client.currentsong()["file"], "utf-8")))
       songid = (client.currentsong()["id"])
 
   if armed == 0 and not songid == client.currentsong()["id"]: 
