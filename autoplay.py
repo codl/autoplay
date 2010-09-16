@@ -159,8 +159,8 @@ while __name__ == "__main__":
       listened(getsong(unicode(client.currentsong()["file"], "utf-8")))
       songid = (client.currentsong()["id"])
 
-  if armed == 0 and not songid == client.currentsong()["id"]: 
-    armed = 1
+    if armed == 0 and not songid == client.currentsong()["id"]: 
+      armed = 1
   
   time.sleep(delay)
 
