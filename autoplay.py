@@ -152,7 +152,7 @@ while __name__ == "__main__":
     cursongid = client.status()["songid"]
     for song in client.playlistid():
       if song["id"] == cursongid:
-        plistlength = int(song["pos"]) + trigger + 1
+        plistlength = int(song["pos"]) + trigger
       
   else:
     plistlength = trigger

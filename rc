@@ -15,7 +15,7 @@ case "$1" in
   stop)
     stat_busy "Stopping Autoplay"
     for i in $(ps -Ao pid,args | grep "python2 $bin"\
-      | grep -v grep | cut -d' ' -f1); do kill $i; done
+      | grep -v grep | cut -d" " -f2); do kill $i; done
     stat_done
   ;;
   restart)
