@@ -56,7 +56,7 @@ def reconnect(i=1):
 def addsong():
   rand = random.uniform(-0.1, 1.5)
   cursor.execute("select * from songs where karma>? and time < ?",
-      (rand, int(time.time()-(60*(flood_delay-trigger*3)))))
+    (rand, int(time.time()-(60*(flood_delay-trigger*3)))))
   data = cursor.fetchall()
   if data == []:
     addsong()
@@ -64,12 +64,12 @@ def addsong():
     songdata = random.choice(data)
     newkarma = karma(songdata, 2)
     cursor.execute(
-        "update songs set added=?, karma=?, time=? where file=?",
-        (songdata[2]+1, newkarma, int(time.time()), songdata[0],)
+      "update songs set added=?, karma=?, time=? where file=?",
+      (songdata[2]+1, newkarma, int(time.time()), songdata[0],)
     )
     db.commit()
     log("Adding song "+songdata[0]+" - Karma = "+
-        str(songdata[3])+" - Karma limit = "+str(rand))
+      str(songdata[3])+" - Karma limit = "+str(rand))
     client.add(songdata[0])
 
 def getsong(songfile):
@@ -77,8 +77,9 @@ def getsong(songfile):
   cursor.execute("select * from songs where file=?", (songfile,))
   data = cursor.fetchone()
   if data == None:
-    cursor.execute("insert into songs values (?, 0, 0, 0.5, 0)", (song,))
-    data = (song, 0, 0, 0.5, 0)
+    cursor.execute("insert into songs values (?, 0, 0, 0.5, 0)",
+      (songfile,))
+    data = (songfile, 0, 0, 0.5, 0)
   return data
 
 def karma(songdata, which=0):
@@ -99,11 +100,11 @@ def karma(songdata, which=0):
 def listened(songdata):
   newkarma = karma(songdata, 1)
   cursor.execute(
-      "update songs set listened=?, karma=?, time=? where file=?",
-      (songdata[1]+1, newkarma, int(time.time()), songdata[0])
+    "update songs set listened=?, karma=?, time=? where file=?",
+    (songdata[1]+1, newkarma, int(time.time()), songdata[0])
   )
   log("Listened to "+songdata[0]+" - Karma = "+
-      str(newkarma)+" - Listens = "+str(songdata[1]+1))
+    str(newkarma)+" - Listens = "+str(songdata[1]+1))
   db.commit()
 ## /Functions
 
@@ -147,9 +148,17 @@ log("OK! :)")
 armed = 1
 
 while __name__ == "__main__":
-  while len(client.playlist()) < trigger:
-    addsong()
+  if client.status()["consume"] == "0":
+    cursongid = client.status()["songid"]
+    for song in client.playlistid():
+      if song["id"] == cursongid:
+        plistlength = int(song["pos"]) + trigger + 1
+      
+  else:
+    plistlength = trigger
 
+  while len(client.playlist()) < plistlength:
+    addsong()
   if client.status()['state'] == "play":
     times = client.status()['time'].split(":")
     pos = int(times[0])
