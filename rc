@@ -9,7 +9,7 @@ runas="mpd"
 case "$1" in
   start)
     stat_busy "Starting Autoplay"
-    su $runas -c $bin > /dev/null &>> /tmp/autoplay.log &
+    su $runas -c "$bin > /dev/null &>> /tmp/autoplay.log &"
     stat_done
   ;;
   stop)
