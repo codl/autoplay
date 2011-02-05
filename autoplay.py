@@ -7,13 +7,14 @@ Dependencies : python-mpd
                pysqlite
 '''
 
-import os.path
+import os
 import mpd
 import random
 import sqlite3
 import time
 import io
 import sys
+import threading
 from socket import error as socketerror
 
 ## Config
@@ -113,9 +114,6 @@ def listened(songdata):
   db.commit()
 ## /Functions
 
-db = sqlite3.connect(os.path.expanduser(dbfile))
-cursor = db.cursor()
-
 random.seed()
 client = mpd.MPDClient()
 
@@ -135,21 +133,46 @@ if password:
     log("Wrong password?", stdout=True)
     exit(2)
 
-log("Updating database...")
-cursor.execute("create table if not exists songs(\
-  file text, listened int, added int, karma real, time int\
-  );")
-stale = []
-for song in cursor.execute("select file from songs"):
-  if not os.path.isfile("/home/codl/music/" + song[0]):
-    stale.append(song[0])
-for song in stale:
-  cursor.execute("delete from songs where file=?", (song,))
-db.commit()
-for song in client.list("file"):
-  nothing = getsong(unicode(song, enc))
-db.commit()
-log("OK! :)")
+
+def updatedb(sleep=0.003):
+  os.nice(20)
+  log("Updating database...")
+  db = sqlite3.connect(os.path.expanduser(dbfile))
+  cursor = db.cursor()
+  cursor.execute("create table if not exists songs(\
+    file text, listened int, added int, karma real, time int\
+    );")
+  stale = []
+  for song in client.list("file"):
+    song = unicode(song, enc)
+    cursor.execute("select * from songs where file=?", (song,))
+    if cursor.fetchone() == None:
+      cursor.execute("insert into songs values (?, 0, 0, 0.5, 0)",
+        (song,))
+    time.sleep(sleep)
+  db.commit()
+  for song in cursor.execute("select file from songs"):
+    if not os.path.isfile("/home/codl/music/" + song[0]):
+      stale.append(song[0])
+      time.sleep(sleep)
+  for song in stale:
+    cursor.execute("delete from songs where file=?", (song,))
+    time.sleep(sleep)
+  db.commit()
+  log("Database updated! :)")
+
+time.sleep(3)
+updater = threading.Thread(target=updatedb)
+updater.start()
+updater.join(7)
+if updater.isAlive():
+  log("Update is too slow, starting with incomplete db")
+  log("The db will continue updating in the background")
+
+
+db = sqlite3.connect(os.path.expanduser(dbfile))
+cursor = db.cursor()
+
 armed = 1
 
 while __name__ == "__main__":
