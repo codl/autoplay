@@ -14,7 +14,6 @@ import sqlite3
 import time
 import io
 import sys
-import threading
 from socket import error as socketerror
 
 ## Config
@@ -118,8 +117,6 @@ random.seed()
 client = mpd.MPDClient()
 
 logio = io.open(logfile, "at", buffering=1)
-log("\n\nStarted "+str(time.time())+"\n")
-
 log("Connecting...")
 try:
   client.connect(server, port)
@@ -128,13 +125,15 @@ except socketerror:
 
 if password:
   try:
+    log("Using password")
     client.password(password)
   except mpd.CommandError:
     log("Wrong password?", stdout=True)
     exit(2)
+log("Ok.")
 
 
-def updatedb(sleep=0.003):
+def updatedb(sleep=0.01):
   os.nice(20)
   log("Updating database...")
   db = sqlite3.connect(os.path.expanduser(dbfile))
@@ -149,56 +148,58 @@ def updatedb(sleep=0.003):
     if cursor.fetchone() == None:
       cursor.execute("insert into songs values (?, 0, 0, 0.5, 0)",
         (song,))
+      db.commit()
     time.sleep(sleep)
-  db.commit()
   for song in cursor.execute("select file from songs"):
     if not os.path.isfile("/home/codl/music/" + song[0]):
       stale.append(song[0])
+      db.commit()
       time.sleep(sleep)
   for song in stale:
     cursor.execute("delete from songs where file=?", (song,))
+    db.commit()
     time.sleep(sleep)
-  db.commit()
   log("Database updated! :)")
 
-time.sleep(3)
-updater = threading.Thread(target=updatedb)
-updater.start()
-updater.join(7)
-if updater.isAlive():
-  log("Update is too slow, starting with incomplete db")
-  log("The db will continue updating in the background")
 
+found = 0
+for arg in sys.argv:
+  if found == 1 and arg != "":
+    updatedb(1/(float(arg)*100))
+    break
+  elif found == 1:
+    updatedb()
+    break
+  if arg == "-u":
+    found = 1
+if len(sys.argv)==1:
+  db = sqlite3.connect(os.path.expanduser(dbfile))
+  cursor = db.cursor()
+  armed = 1
+  while __name__ == "__main__":
+    if client.status()["consume"] == "0":
+      cursongid = client.status()["songid"]
+      for song in client.playlistid():
+        if song["id"] == cursongid:
+          plistlength = int(song["pos"]) + trigger
+        
+    else:
+      plistlength = trigger
 
-db = sqlite3.connect(os.path.expanduser(dbfile))
-cursor = db.cursor()
+    while len(client.playlist()) < plistlength:
+      addsong()
+    if client.status()['state'] == "play":
+      times = client.status()['time'].split(":")
+      pos = int(times[0])
+      end = int(times[1])
+      if armed == 1 and (end > mintime) and (pos > playtime*end/100):
+        armed = 0 # Disarm until the next song
+        listened(getsong(unicode(client.currentsong()["file"], enc)))
+        songid = (client.currentsong()["id"])
 
-armed = 1
-
-while __name__ == "__main__":
-  if client.status()["consume"] == "0":
-    cursongid = client.status()["songid"]
-    for song in client.playlistid():
-      if song["id"] == cursongid:
-        plistlength = int(song["pos"]) + trigger
-      
-  else:
-    plistlength = trigger
-
-  while len(client.playlist()) < plistlength:
-    addsong()
-  if client.status()['state'] == "play":
-    times = client.status()['time'].split(":")
-    pos = int(times[0])
-    end = int(times[1])
-    if armed == 1 and (end > mintime) and (pos > playtime*end/100):
-      armed = 0 # Disarm until the next song
-      listened(getsong(unicode(client.currentsong()["file"], enc)))
-      songid = (client.currentsong()["id"])
-
-    if armed == 0 and not songid == client.currentsong()["id"]: 
-      armed = 1
-  
-  time.sleep(delay)
+      if armed == 0 and not songid == client.currentsong()["id"]: 
+        armed = 1
+    
+    time.sleep(delay)
 
 # vim: tw=70 ts=2 sw=2

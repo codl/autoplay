@@ -14,13 +14,26 @@ case "$1" in
   ;;
   stop)
     stat_busy "Stopping Autoplay"
-    for i in $(ps -Ao pid,args | grep "python2 $bin"\
-      | grep -v grep | cut -d" " -f2); do kill $i; done
+    pkill -fx "python2 $bin"
     stat_done
   ;;
   restart)
     $0 stop
     $0 start
+  ;;
+  update)
+    if [[ $(pgrep -fx "python2 $bin") -ne 0 ]]
+    then
+      running=1
+      $0 stop
+    fi
+    stat_busy "Updating Autoplay database"
+    su $runas -c "$bin -u 7 > /dev/null &>> /tmp/autoplay.log"
+    stat_done
+    if [[ $running -eq 1 ]]
+    then
+      $0 start
+    fi
   ;;
   *)
     echo "usage: $0 {start|stop|restart}"

@@ -22,6 +22,8 @@ Usage
 Run `sudo ./install.sh` to install and configure autoplay.
 (Note: If you change any configuration variables by editing `autoplay.py` before running `install.sh`, it won't ask you about these)
 
+Update the autoplay database by running `autoplay -u` or `wherever_your_rc_is/autoplay update`. You need to do this each time you add new songs to mpd, so that autoplay knows about them.
+
 Then, start autoplay either by calling autoplay directly or using the rc script. It will start building statistics and continuously fill your playlist.
 
 How it works
