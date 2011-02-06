@@ -153,7 +153,7 @@ def updateone():
   # Verify in DB
   cursor.execute("select * from songs where file=?", (song,))
   if cursor.fetchone() == None:
-    cursor.execute("insert into songs values (?, 0, 0, 1, 0)",
+    cursor.execute("insert into songs values (?, 0, 0, 5, 0)",
       (song,))
     db.commit()
 
