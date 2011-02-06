@@ -28,7 +28,7 @@ case "$1" in
       $0 stop
     fi
     stat_busy "Updating Autoplay database"
-    su $runas -c "$bin -u 7 > /dev/null &>> /tmp/autoplay.log"
+    su $runas -c "$bin -u > /dev/null &>> /tmp/autoplay.log"
     stat_done
     if [[ $running -eq 1 ]]
     then
@@ -36,7 +36,7 @@ case "$1" in
     fi
   ;;
   *)
-    echo "usage: $0 {start|stop|restart}"
+    echo "usage: $0 {start|stop|restart|update}"
 	;;
 esac
 exit 0

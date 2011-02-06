@@ -55,6 +55,10 @@ read DOTD
 [[ $DOTD == "" ]] && [[ -d /etc/rc.d ]] && DOTD="/etc/rc.d"
 [[ $DOTD == "" ]] && [[ -d /etc/init.d ]] && DOTD="/etc/init.d"
 [[ $DOTD == "" ]] || [[ ! -d $DOTD ]] && printf "Could not find rc.d or init.d directory. rc script will not be installed\n" && DOTD=""
+
+echo "Done! Autoplay has been installed to $BIN/autoplay :)"
+echo "You might want to run 'autoplay -u' before running autoplay if this is your first time using autoplay to build the database"
+
 if [[ $DOTD != "" ]]; then
   mv /tmp/rc $DOTD/autoplay
   printf "Do you want to start autoplay right now?\ny/N > "
@@ -62,4 +66,3 @@ if [[ $DOTD != "" ]]; then
   [[ $REPLY == "y" ]] || [[ $REPLY == "yes" ]] || [[ $REPLY == "Y" ]] || [[ $REPLY == "Yes" ]] || [[ $REPLY == "YES" ]] && $DOTD/autoplay start
 fi
 
-echo "Done! Autoplay has been installed to $BIN/autoplay :)"

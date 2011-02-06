@@ -58,11 +58,12 @@ def reconnect(i=1):
 
 def addsong():
   """Adds a semi-random song to the playlist"""
-  rand = random.uniform(-0.1, 1.5)
+  rand = random.uniform(-0.5, 2)
   cursor.execute("select * from songs where karma>? and time < ?",
     (rand, int(time.time()-(60*(flood_delay-trigger*3)))))
   data = cursor.fetchall()
   if data == []:
+    updateone()
     addsong()
   else:
     songdata = random.choice(data)
@@ -130,53 +131,63 @@ if password:
   except mpd.CommandError:
     log("Wrong password?", stdout=True)
     exit(2)
-log("Ok.")
 
+log("Connected")
 
-def updatedb(sleep=0.01):
-  os.nice(20)
-  log("Updating database...")
-  db = sqlite3.connect(os.path.expanduser(dbfile))
-  cursor = db.cursor()
-  cursor.execute("create table if not exists songs(\
-    file text, listened int, added int, karma real, time int\
-    );")
-  stale = []
-  for song in client.list("file"):
-    song = unicode(song, enc)
-    cursor.execute("select * from songs where file=?", (song,))
-    if cursor.fetchone() == None:
-      cursor.execute("insert into songs values (?, 0, 0, 0.5, 0)",
-        (song,))
-      db.commit()
-    time.sleep(sleep)
-  for song in cursor.execute("select file from songs"):
-    if not os.path.isfile("/home/codl/music/" + song[0]):
-      stale.append(song[0])
-      db.commit()
-      time.sleep(sleep)
-  for song in stale:
-    cursor.execute("delete from songs where file=?", (song,))
+allsongs = []
+def updateone():
+  os.nice(5)
+  if allsongs == []:
+    cursor.execute("create table if not exists songs(\
+      file text, listened int, added int, karma real, time int\
+      );")
     db.commit()
-    time.sleep(sleep)
-  log("Database updated! :)")
+    for song in client.list("file"):
+      allsongs.append(unicode(song, enc))
+    for song in cursor.execute("select file from songs;"):
+      allsongs.append(song[0])
+    random.shuffle(allsongs)
+
+  song = allsongs.pop()
+  #for j in range(i) : allsongs.pop() #Remove duplicates
+  # Verify in DB
+  cursor.execute("select * from songs where file=?", (song,))
+  if cursor.fetchone() == None:
+    cursor.execute("insert into songs values (?, 0, 0, 1, 0)",
+      (song,))
+    db.commit()
+
+  # Verify in fs
+  if not os.path.isfile("/home/codl/music/" + song):
+    cursor.execute("delete from songs where file=?", (song,))
+
+  os.nice(-5)
 
 
-found = 0
+db = sqlite3.connect(os.path.expanduser(dbfile))
+cursor = db.cursor()
+
 for arg in sys.argv:
-  if found == 1 and arg != "":
-    updatedb(1/(float(arg)*100))
-    break
-  elif found == 1:
-    updatedb()
-    break
   if arg == "-u":
-    found = 1
+    log("Starting complete update", True)
+    updateone()
+    while allsongs != []:
+      if len(allsongs) % 200 == 0:
+        log(str(len(allsongs)) + " left", True)
+      updateone()
+    log("Done", True)
+
 if len(sys.argv)==1:
-  db = sqlite3.connect(os.path.expanduser(dbfile))
-  cursor = db.cursor()
+  for i in range(30):
+    updateone()
+
   armed = 1
+
+  log("Ready")
+
   while __name__ == "__main__":
+    updateone()
+
     if client.status()["consume"] == "0":
       cursongid = client.status()["songid"]
       for song in client.playlistid():
@@ -186,7 +197,7 @@ if len(sys.argv)==1:
     else:
       plistlength = trigger
 
-    while len(client.playlist()) < plistlength:
+    if len(client.playlist()) < plistlength:
       addsong()
     if client.status()['state'] == "play":
       times = client.status()['time'].split(":")
