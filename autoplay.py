@@ -20,7 +20,7 @@ from socket import error as socketerror
 server = "localhost"
 port = 6600
 password = False # Set to False if none
-dbfile = "~/music/.autodb"
+musicdir = "~/music/"
 trigger = 8 # A new song will be added when the playlist
             #  has less songs than this
             #  You can set this to 0 if you only want the stats
@@ -158,13 +158,13 @@ def updateone():
     db.commit()
 
   # Verify in fs
-  if not os.path.isfile("/home/codl/music/" + song):
+  if not os.path.isfile(os.path.expanduser(musicdir) + song):
     cursor.execute("delete from songs where file=?", (song,))
 
   os.nice(-5)
 
 
-db = sqlite3.connect(os.path.expanduser(dbfile))
+db = sqlite3.connect(os.path.expanduser(musicdir+".autodb"))
 cursor = db.cursor()
 
 for arg in sys.argv:

@@ -43,7 +43,7 @@ if [[ $(sed -n "/pass.*False.*#/p" /tmp/autoplay) != '' ]]; then
 fi
 
 if [[ $(sed -n "/\~\/music/p" /tmp/autoplay) != '' ]]; then
-  printf "Where should the DB go?\n(Default : ~/music) > "
+  printf "Where is your music located?\n(Default : ~/music) > "
   read DB
   [[ $DB != "" ]] && sed -i "s|~/music|$DB|" /tmp/autoplay
 fi
