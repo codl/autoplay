@@ -75,7 +75,7 @@ def addsong():
     db.commit()
     log(("Adding song "+songdata[0]+" - Karma = "+
       str(songdata[3])+" - Karma limit = "+str(rand)).encode(enc))
-    client.add(songdata[0])
+    client.add(songdata[0].encode(enc))
 
 def getsong(songfile):
   """Retrieve song data from DB"""
