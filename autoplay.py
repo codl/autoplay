@@ -36,7 +36,8 @@ debug = False
 logfile = "/tmp/autoplay.log"
 ## /Config
 
-enc = sys.getfilesystemencoding()
+#enc = sys.getfilesystemencoding()
+enc = "UTF/8"
 
 ## Functions
 def log(msg, stdout=False):
@@ -203,13 +204,13 @@ if len(sys.argv)==1:
       times = client.status()['time'].split(":")
       pos = int(times[0])
       end = int(times[1])
-      if armed == 1 and (end > mintime) and (pos > playtime*end/100):
-        armed = 0 # Disarm until the next song
-        listened(getsong(unicode(client.currentsong()["file"], enc)))
-        songid = (client.currentsong()["id"])
-
-      if armed == 0 and not songid == client.currentsong()["id"]: 
+      currentsong = client.currentsong()
+      if armed == 0 and "id" in currentsong and not songid == currentsong["id"]: 
         armed = 1
+      elif armed == 1 and (end > mintime) and (pos > playtime*end/100):
+        armed = 0 # Disarm until the next song
+        listened(getsong(unicode(currentsong["file"], enc)))
+        songid = (currentsong["id"])
     
     time.sleep(delay)
 
