@@ -37,7 +37,7 @@ logfile = "/tmp/autoplay.log"
 ## /Config
 
 #enc = sys.getfilesystemencoding()
-enc = "UTF/8"
+enc = "UTF-8"
 
 ## Functions
 def log(msg, stdout=False):
