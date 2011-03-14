@@ -118,7 +118,7 @@ def listened(songdata):
 random.seed()
 client = mpd.MPDClient()
 
-logio = io.open(logfile, "at", buffering=1)
+logio = io.open(logfile, "at", buffering=1, encoding=enc)
 log("Connecting...")
 try:
   client.connect(server, port)
