@@ -159,13 +159,14 @@ def updateone():
     db.commit()
 
   # Verify in fs
-  if not os.path.isfile(os.path.expanduser(musicdir) + song):
+  if not os.path.isfile((os.path.expanduser(musicdir) +
+    song).decode(enc)):
     cursor.execute("delete from songs where file=?", (song,))
 
   os.nice(-5)
 
 
-db = sqlite3.connect(os.path.expanduser(musicdir+".autodb"))
+db = sqlite3.connect(os.path.expanduser((musicdir+".autodb").decode(enc)))
 cursor = db.cursor()
 
 for arg in sys.argv:
@@ -194,7 +195,7 @@ if len(sys.argv)==1:
       for song in client.playlistid():
         if song["id"] == cursongid:
           plistlength = int(song["pos"]) + trigger
-        
+
     else:
       plistlength = trigger
 
