@@ -160,13 +160,13 @@ def updateone():
 
   # Verify in fs
   if not os.path.isfile((os.path.expanduser(musicdir) +
-    song).decode(enc)):
+    song).encode(enc)):
     cursor.execute("delete from songs where file=?", (song,))
 
   os.nice(-5)
 
 
-db = sqlite3.connect(os.path.expanduser((musicdir+".autodb").decode(enc)))
+db = sqlite3.connect(os.path.expanduser((musicdir+".autodb").encode(enc)))
 cursor = db.cursor()
 
 for arg in sys.argv:
