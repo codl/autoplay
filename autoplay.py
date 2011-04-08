@@ -137,7 +137,6 @@ log("Connected")
 
 allsongs = []
 def updateone():
-  os.nice(5)
   if allsongs == []:
     cursor.execute("create table if not exists songs(\
       file text, listened int, added int, karma real, time int\
@@ -162,8 +161,6 @@ def updateone():
   if not os.path.isfile((os.path.expanduser(musicdir) +
     song).encode(enc)):
     cursor.execute("delete from songs where file=?", (song,))
-
-  os.nice(-5)
 
 
 db = sqlite3.connect(os.path.expanduser((musicdir+".autodb").encode(enc)))
