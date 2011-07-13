@@ -29,7 +29,11 @@ playtime = 70 # Percentage of a song that must be played before
 mintime = 25 # Minimum length of a track for it
              #  to be considered a song (in seconds)
 flood_delay = 12*60 # Minutes to wait before adding the same song again
-delay = 0.8 # Make this higher if hogging cpu (not likely)
+
+mindelay = 0.5 # These are the min and max polling delays
+maxdelay = 3.0 # These values should be sane for pretty much any
+               # remotely recent computer. Increase them if cpu usage
+               # is too high
 tries = 3 # Retry connecting this many times
 
 debug = False
@@ -181,8 +185,10 @@ if len(sys.argv)==1:
     updateone()
 
   armed = 1
+  delay = mindelay
 
   log("Ready")
+
 
   while __name__ == "__main__":
     updateone()
@@ -199,6 +205,7 @@ if len(sys.argv)==1:
 
       if len(client.playlist()) < plistlength:
         addsong()
+        delay = mindelay
       if client.status()['state'] == "play":
         times = client.status()['time'].split(":")
         pos = int(times[0])
@@ -215,5 +222,6 @@ if len(sys.argv)==1:
       pass
 
     time.sleep(delay)
+    delay = min((delay*1.5, maxdelay))
 
 # vim: tw=70 ts=2 sw=2
