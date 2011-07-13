@@ -27,9 +27,9 @@ trigger = 8 # A new song will be added when the playlist
 playtime = 70 # Percentage of a song that must be played before
               #  play count is incremented
 mintime = 25 # Minimum length of a track for it
-             #  to be considered a song
+             #  to be considered a song (in seconds)
 flood_delay = 12*60 # Minutes to wait before adding the same song again
-delay = 0.8 # Make this higher if hogging cpu (not likely) 
+delay = 0.8 # Make this higher if hogging cpu (not likely)
 tries = 3 # Retry connecting this many times
 
 debug = False
@@ -187,29 +187,33 @@ if len(sys.argv)==1:
   while __name__ == "__main__":
     updateone()
 
-    if client.status()["consume"] == "0":
-      cursongid = client.status()["songid"]
-      for song in client.playlistid():
-        if song["id"] == cursongid:
-          plistlength = int(song["pos"]) + trigger
+    try:
+      if client.status()["consume"] == "0":
+        cursongid = client.status()["songid"]
+        for song in client.playlistid():
+          if song["id"] == cursongid:
+            plistlength = int(song["pos"]) + trigger
 
-    else:
-      plistlength = trigger
+      else:
+        plistlength = trigger
 
-    if len(client.playlist()) < plistlength:
-      addsong()
-    if client.status()['state'] == "play":
-      times = client.status()['time'].split(":")
-      pos = int(times[0])
-      end = int(times[1])
-      currentsong = client.currentsong()
-      if armed == 0 and "id" in currentsong and not songid == currentsong["id"]: 
-        armed = 1
-      elif armed == 1 and (end > mintime) and (pos > playtime*end/100):
-        armed = 0 # Disarm until the next song
-        listened(getsong(unicode(currentsong["file"], enc)))
-        songid = (currentsong["id"])
-    
+      if len(client.playlist()) < plistlength:
+        addsong()
+      if client.status()['state'] == "play":
+        times = client.status()['time'].split(":")
+        pos = int(times[0])
+        end = int(times[1])
+        currentsong = client.currentsong()
+        if armed == 0 and "id" in currentsong and not songid == currentsong["id"]:
+          armed = 1
+        elif armed == 1 and (end > mintime) and (pos > playtime*end/100):
+          armed = 0 # Disarm until the next song
+          listened(getsong(unicode(currentsong["file"], enc)))
+          songid = (currentsong["id"])
+
+    except KeyError:
+      pass
+
     time.sleep(delay)
 
 # vim: tw=70 ts=2 sw=2
