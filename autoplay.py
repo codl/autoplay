@@ -65,7 +65,7 @@ def addsong():
   """Adds a semi-random song to the playlist"""
   rand = random.uniform(-0.5, 2)
   cursor.execute("select * from songs where karma>? and time < ?",
-    (rand, int(time.time()-(60*(flood_delay-trigger*3)))))
+      (rand, int(time.time()-(60*(flood_delay-trigger*3)))))
   data = cursor.fetchall()
   if data == []:
     updateone()
@@ -74,9 +74,9 @@ def addsong():
     songdata = random.choice(data)
     newkarma = karma(songdata, 2)
     cursor.execute(
-      "update songs set added=?, karma=?, time=? where file=?",
-      (songdata[2]+1, newkarma, int(time.time()), songdata[0],)
-    )
+        "update songs set added=?, karma=?, time=? where file=?",
+        (songdata[2]+1, newkarma, int(time.time()), songdata[0],)
+        )
     db.commit()
     log(("Adding song "+songdata[0]+" - Karma = "+
       str(songdata[3])+" - Karma limit = "+str(rand)).encode(enc))
@@ -88,7 +88,7 @@ def getsong(songfile):
   data = cursor.fetchone()
   if data == None:
     cursor.execute("insert into songs values (?, 0, 0, 0.5, 0)",
-      (songfile,))
+        (songfile,))
     data = (songfile, 0, 0, 0.5, 0)
   return data
 
@@ -111,9 +111,9 @@ def karma(songdata, which=0):
 def listened(songdata):
   newkarma = karma(songdata, 1)
   cursor.execute(
-    "update songs set listened=?, karma=?, time=? where file=?",
-    (songdata[1]+1, newkarma, int(time.time()), songdata[0])
-  )
+      "update songs set listened=?, karma=?, time=? where file=?",
+      (songdata[1]+1, newkarma, int(time.time()), songdata[0])
+      )
   log(("Listened to "+songdata[0]+" - Karma = "+
     str(newkarma)+" - Listens = "+str(songdata[1]+1)).encode(enc))
   db.commit()
@@ -143,8 +143,8 @@ allsongs = []
 def updateone():
   if allsongs == []:
     cursor.execute("create table if not exists songs(\
-      file text, listened int, added int, karma real, time int\
-      );")
+        file text, listened int, added int, karma real, time int\
+        );")
     db.commit()
     for song in client.list("file"):
       allsongs.append(unicode(song, enc))
@@ -158,7 +158,7 @@ def updateone():
   cursor.execute("select * from songs where file=?", (song,))
   if cursor.fetchone() == None:
     cursor.execute("insert into songs values (?, 0, 0, 5, 0)",
-      (song,))
+        (song,))
     db.commit()
 
   # Verify in fs
