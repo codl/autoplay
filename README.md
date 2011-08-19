@@ -1,14 +1,14 @@
 autoplay
 ========
 
-... is a simple daemon that keeps your [MPD][] playlist filled with the music you like the most.
+a daemon that keeps your [MPD][] playlist filled with the music you actually listen to
 
 [MPD]: http://mpd.wikia.com (Music Player Daemon)
 
 Dependencies
 ------------
 
-* [python][py]
+* [python 2.6][py]
 * [python-mpd][pympd]
 * [pysqlite][]
 
@@ -20,7 +20,7 @@ Usage
 -----
 
 Run `sudo ./install.sh` to install and configure autoplay.
-(Note: If you change any configuration variables by editing `autoplay.py` before running `install.sh`, it won't ask you about these)
+(Note: advanced configuration variables are available at the top of `autoplay.py`. Edit them before installing if you wish to.)
 
 Then, start autoplay either by calling autoplay directly or using the rc script. It will start building statistics and continuously fill your playlist.
 
