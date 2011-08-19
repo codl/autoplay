@@ -29,9 +29,8 @@ playtime = 70 # Percentage of a song that must be played before
 mintime = 25 # Minimum length of a track for it
              #  to be considered a song (in seconds)
 flood_delay = 12*60 # Minutes to wait before adding the same song again
-
 mindelay = 0.5 # These are the min and max polling delays
-maxdelay = 3.0 # These values should be sane for pretty much any
+maxdelay = 1.5 # These values should be sane for pretty much any
                # remotely recent computer. Increase them if cpu usage
                # is too high
 tries = 3 # Retry connecting this many times
@@ -54,7 +53,7 @@ def reconnect(i=1):
   if i == tries:
     log("Could not connect to server D:", stdout=True)
     exit(1)
-  log("Tried "+str(i)+" times")
+  log("Tried connecting "+str(i)+" times")
   try:
     client.connect(server, port)
   except socketerror:
@@ -64,14 +63,15 @@ def reconnect(i=1):
 def addsong():
   """Adds a semi-random song to the playlist"""
   rand = random.uniform(-0.5, 2)
-  cursor.execute("select * from songs where karma>? and time < ?",
+  cursor.execute("select * from songs where karma>? and time < ?\
+      ORDER BY random() LIMIT 1;",
       (rand, int(time.time()-(60*(flood_delay-trigger*3)))))
   data = cursor.fetchall()
   if data == []:
     updateone()
     addsong()
   else:
-    songdata = random.choice(data)
+    songdata = data[0]
     newkarma = karma(songdata, 2)
     cursor.execute(
         "update songs set added=?, karma=?, time=? where file=?",
@@ -134,7 +134,7 @@ if password:
     log("Using password")
     client.password(password)
   except mpd.CommandError:
-    log("Wrong password?", stdout=True)
+    log("Couldn't connect. Wrong password?", stdout=True)
     exit(2)
 
 log("Connected")
@@ -153,15 +153,14 @@ def updateone():
     random.shuffle(allsongs)
 
   song = allsongs.pop()
-  #for j in range(i) : allsongs.pop() #Remove duplicates
-  # Verify in DB
+  # Check if the file is in DB
   cursor.execute("select * from songs where file=?", (song,))
   if cursor.fetchone() == None:
     cursor.execute("insert into songs values (?, 0, 0, 5, 0)",
         (song,))
     db.commit()
 
-  # Verify in fs
+  # Check if the file exists
   if not os.path.isfile((os.path.expanduser(musicdir) +
     song).encode(enc)):
     cursor.execute("delete from songs where file=?", (song,))
@@ -198,12 +197,12 @@ if len(sys.argv)==1:
         cursongid = client.status()["songid"]
         for song in client.playlistid():
           if song["id"] == cursongid:
-            plistlength = int(song["pos"]) + trigger
+            neededlength = int(song["pos"]) + trigger
 
       else:
-        plistlength = trigger
+        neededlength = trigger
 
-      if len(client.playlist()) < plistlength:
+      if len(client.playlist()) < neededlength:
         addsong()
         delay = mindelay
       if client.status()['state'] == "play":
