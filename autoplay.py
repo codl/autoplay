@@ -182,9 +182,9 @@ def serve():
 
 
   while True:
-    updateone()
 
     try:
+    updateone()
       if radioMode:
         if client.status()["consume"] == "0":
           cursongid = client.status()["songid"]
