@@ -183,9 +183,9 @@ if len(sys.argv)==1:
 
 
   while __name__ == "__main__":
-    updateone()
-
     try:
+      updateone()
+
       if client.status()["consume"] == "0":
         cursongid = client.status()["songid"]
         for song in client.playlistid():
