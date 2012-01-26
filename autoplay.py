@@ -33,7 +33,7 @@ mindelay = 0.5 # These are the min and max polling delays
 maxdelay = 1.5 # These values should be sane for pretty much any
                # remotely recent computer. Increase them if cpu usage
                # is too high
-tries = 3 # Retry connecting this many times
+tries = 10 # Retry connecting this many times
 
 debug = False
 logfile = "/tmp/autoplay.log"
@@ -49,15 +49,18 @@ def log(msg, stdout=False):
     print msg
   logio.write(unicode(msg, enc)+"\n")
 
-def reconnect(i=1):
+def connect(i=1):
+  log("N Connecting...")
   if i == tries:
-    log("Could not connect to server D:", stdout=True)
+    log("E Could not connect to server D:", stdout=True)
     exit(1)
-  log("Tried connecting "+str(i)+" times")
   try:
     client.connect(server, port)
   except socketerror:
-    reconnect(i+1)
+    log("N Try n°"+str(i)+" failed")
+    time.sleep(i*3)
+    connect(i+1)
+  log("N Connected")
 
 
 def addsong():
@@ -78,8 +81,6 @@ def addsong():
         (songdata[2]+1, newkarma, int(time.time()), songdata[0],)
         )
     db.commit()
-    log(("Adding song "+songdata[0]+" - Karma = "+
-      str(songdata[3])+" - Karma limit = "+str(rand)).encode(enc))
     client.add(songdata[0].encode(enc))
 
 def getsong(songfile):
@@ -114,8 +115,6 @@ def listened(songdata):
       "update songs set listened=?, karma=?, time=? where file=?",
       (songdata[1]+1, newkarma, int(time.time()), songdata[0])
       )
-  log(("Listened to "+songdata[0]+" - Karma = "+
-    str(newkarma)+" - Listens = "+str(songdata[1]+1)).encode(enc))
   db.commit()
 ## /Functions
 
@@ -123,21 +122,15 @@ random.seed()
 client = mpd.MPDClient()
 
 logio = io.open(logfile, "at", buffering=1, encoding=enc)
-log("Connecting...")
-try:
-  client.connect(server, port)
-except socketerror:
-  reconnect()
+connect()
 
 if password:
   try:
-    log("Using password")
+    log("D Using password")
     client.password(password)
   except mpd.CommandError:
-    log("Couldn't connect. Wrong password?", stdout=True)
+    log("E Couldn't connect. Wrong password?", stdout=True)
     exit(2)
-
-log("Connected")
 
 allsongs = []
 def updateone():
@@ -171,13 +164,13 @@ cursor = db.cursor()
 
 for arg in sys.argv:
   if arg == "-u":
-    log("Starting complete update", True)
+    log("N Starting complete update", True)
     updateone()
     while allsongs != []:
       if len(allsongs) % 200 == 0:
-        log(str(len(allsongs)) + " left", True)
+        log("D "+str(len(allsongs)) + " left", True)
       updateone()
-    log("Done", True)
+    log("N Done", True)
 
 if len(sys.argv)==1:
   for i in range(30):
@@ -186,7 +179,7 @@ if len(sys.argv)==1:
   armed = 1
   delay = mindelay
 
-  log("Ready")
+  log("N Ready")
 
 
   while __name__ == "__main__":
@@ -219,6 +212,11 @@ if len(sys.argv)==1:
 
     except KeyError:
       pass
+
+    except (socketerror, mpd.ConnectionError):
+      log("W Connection to MPD lost")
+      client.disconnect()
+      connect()
 
     time.sleep(delay)
     delay = min((delay*1.5, maxdelay))
