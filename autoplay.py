@@ -1,5 +1,6 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
+
 '''
 Keeps your MPD playlist filled with music you like
 
@@ -15,12 +16,10 @@ import time
 import io
 import sys
 from socket import error as socketerror
+import signal
 
 ## Config
-server = "localhost"
-port = 6600
-password = False # Set to False if none
-musicdir = "~/music/"
+musicdir = os.getenv("HOME") + "/music"
 trigger = 8 # A new song will be added when the playlist
             #  has less songs than this
             #  You can set this to 0 if you only want the stats
@@ -29,24 +28,24 @@ playtime = 70 # Percentage of a song that must be played before
 mintime = 25 # Minimum length of a track for it
              #  to be considered a song (in seconds)
 flood_delay = 12*60 # Minutes to wait before adding the same song again
-mindelay = 0.5 # These are the min and max polling delays
-maxdelay = 1.5 # These values should be sane for pretty much any
+mindelay = 0.1 # These are the min and max polling delays
+maxdelay = 1.0 # These values should be sane for pretty much any
                # remotely recent computer. Increase them if cpu usage
                # is too high
 tries = 10 # Retry connecting this many times
 
-debug = False
 logfile = "/tmp/autoplay.log"
 ## /Config
 
 #enc = sys.getfilesystemencoding()
 enc = "UTF-8"
+#client = None
 
 ## Functions
 def log(msg, stdout=False):
   """Logs to file, and optionally to stdout. Obvious enough"""
-  if stdout or debug:
-    print msg
+  if stdout:
+    print msg[2:]
   logio.write(unicode(msg, enc)+"\n")
 
 def connect(i=1):
@@ -55,7 +54,7 @@ def connect(i=1):
     log("E Could not connect to server D:", stdout=True)
     exit(1)
   try:
-    client.connect(server, port)
+    client.connect(host, port)
   except socketerror:
     log("N Try n°"+str(i)+" failed")
     time.sleep(i*3)
@@ -118,26 +117,12 @@ def listened(songdata):
   db.commit()
 ## /Functions
 
-random.seed()
-client = mpd.MPDClient()
-
-logio = io.open(logfile, "at", buffering=1, encoding=enc)
-connect()
-
-if password:
-  try:
-    log("D Using password")
-    client.password(password)
-  except mpd.CommandError:
-    log("E Couldn't connect. Wrong password?", stdout=True)
-    exit(2)
-
 allsongs = []
 def updateone():
   if allsongs == []:
-    cursor.execute("create table if not exists songs(\
-        file text, listened int, added int, karma real, time int\
-        );")
+    cursor.execute("create table if not exists songs(" +
+        "file text, listened int, added int, karma real, time int" +
+        ");")
     db.commit()
     for song in client.list("file"):
       allsongs.append(unicode(song, enc))
@@ -149,40 +134,53 @@ def updateone():
   # Check if the file is in DB
   cursor.execute("select * from songs where file=?", (song,))
   if cursor.fetchone() == None:
-    cursor.execute("insert into songs values (?, 0, 0, 5, 0)",
+    cursor.execute("insert into songs values (?, 0, 0, 5, 0);",
         (song,))
     db.commit()
 
   # Check if the file exists
-  if not os.path.isfile((os.path.expanduser(musicdir) +
+  if not os.path.isfile((os.path.expanduser(musicdir) + "/" +
     song).encode(enc)):
     cursor.execute("delete from songs where file=?", (song,))
+    db.commit()
 
 
-db = sqlite3.connect(os.path.expanduser((musicdir+".autodb").encode(enc)))
-cursor = db.cursor()
 
-for arg in sys.argv:
-  if arg == "-u":
-    log("N Starting complete update", True)
-    updateone()
-    while allsongs != []:
-      if len(allsongs) % 200 == 0:
-        log("D "+str(len(allsongs)) + " left", True)
-      updateone()
-    log("N Done", True)
+def serve():
+  global client, db, cursor
 
-if len(sys.argv)==1:
-  for i in range(30):
+  db = sqlite3.connect((datahome+"/db.sqlite").encode(enc))
+  cursor = db.cursor()
+  cursor.execute("vacuum;")
+
+
+  random.seed()
+  client = mpd.MPDClient()
+  connect()
+
+  if password:
+    try:
+      log("D Using password")
+      client.password(password)
+    except mpd.CommandError:
+      log("E Couldn't connect. Wrong password?", stdout=True)
+      exit(2)
+
+  for i in range(5):
     updateone()
 
   armed = 1
   delay = mindelay
 
+
   log("N Ready")
 
+  #fifo = open(datahome + "/fifo")
+  fifo = os.fdopen(os.open(datahome + "/fifo",
+              os.O_RDONLY | os.O_NONBLOCK))
 
-  while __name__ == "__main__":
+
+  while True:
     updateone()
 
     try:
@@ -218,7 +216,76 @@ if len(sys.argv)==1:
       client.disconnect()
       connect()
 
+    comm = fifo.readline()
+    if len(comm) != 0:
+      delay = mindelay
+      if comm == "kill\n":
+        client.close()
+        os.unlink(datahome + "/fifo")
+        os.unlink(datahome + "/pid")
+        log("N Quit")
+        exit(0)
+      else: log("W Unknown command : " + comm[:-1])
+
+
     time.sleep(delay)
-    delay = min((delay*1.5, maxdelay))
+    delay = min((delay*1.1, maxdelay))
+
+
+def getServFifo():
+  try:
+    pidf = open(datahome + "/pid") #IOError
+    pid = pidf.read()
+    pidf.close()
+    os.kill(int(pid), 0) #OSError on kill, ValueError on int
+  except (IOError, OSError, ValueError):
+    log("N Starting server", True)
+    pid = os.fork()
+    if pid == 0:
+      serve()
+    pidf = open(datahome + "/pid", "w")
+    pidf.write(str(pid))
+    pidf.close()
+  try:
+    os.mkfifo(datahome + "/fifo")
+  except OSError:
+    pass
+
+  f = open(datahome + "/fifo", "w+")
+  return f
+
+
+
+datahome = (os.getenv("XDG_DATA_HOME") or os.getenv("HOME") +
+            "/.local/share") + "/autoplay"
+if not os.access(datahome, os.W_OK):
+  try:
+    os.makedirs(datahome)
+  except os.error:
+    log("E Couldn't access nor create" + datahome + ", quitting", True)
+    exit(2)
+
+password = None
+
+host = os.getenv("MPD_HOST", "127.0.0.1")
+atloc = host.find("@")
+if(atloc != -1):
+  password = host[:atloc]
+  host = host[atloc+1:]
+
+port = os.getenv("MPD_PORT", "6600")
+#musicdir = os.getenv("MPD_MUSIC_DIR") or os.getenv("mpd_music_dir") \
+#    or os.getenv("HOME") + "/music"
+
+
+logio = io.open(logfile, "at", buffering=1, encoding=enc)
+
+
+
+fifo = getServFifo()
+if len(sys.argv) > 1:
+  fifo.write(" ".join(sys.argv[1:]) + "\n")
+
+fifo.close()
 
 # vim: tw=70 ts=2 sw=2

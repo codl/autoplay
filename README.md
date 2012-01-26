@@ -8,21 +8,33 @@ a daemon that keeps your [MPD][] playlist filled with the music you actually lis
 Dependencies
 ------------
 
-* [python 2.6][py]
+* [python 2.6][python]
 * [python-mpd][pympd]
 * [pysqlite][]
 
-[py]: http://python.org/
+[python]: http://python.org/
 [pympd]: http://jatreuman.indefero.net/p/python-mpd/
 [pysqlite]: http://code.google.com/p/pysqlite/
 
 Usage
 -----
 
-Run `sudo ./install.sh` to install and configure autoplay.
-(Note: advanced configuration variables are available at the top of `autoplay.py`. Edit them before installing if you wish to.)
+```
+autoplay [kill]
+```
 
-Then, start autoplay either by calling autoplay directly or using the rc script. It will start building statistics and continuously fill your playlist.
+Configuration
+-------------
+
+Autoplay will connect to the server according to environment variables `MPD_HOST` and `MPD_PORT`.
+The defaults are :
+
+```sh
+MPD_HOST="127.0.0.1"""
+MPD_PORT="6600"
+```
+
+A password can be used by setting `MPD_HOST="password@host"`.
 
 How it works
 ------------
