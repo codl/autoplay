@@ -19,7 +19,6 @@ from socket import error as socketerror
 import signal
 
 ## Config
-musicdir = os.getenv("HOME") + "/music"
 trigger = 8 # A new song will be added when the playlist
             #  has less songs than this
             #  You can set this to 0 if you only want the stats
@@ -39,7 +38,6 @@ logfile = "/tmp/autoplay.log"
 
 #enc = sys.getfilesystemencoding()
 enc = "UTF-8"
-#client = None
 
 ## Functions
 def log(msg, stdout=False):
@@ -120,10 +118,6 @@ def listened(songdata):
 allsongs = []
 def updateone():
   if allsongs == []:
-    cursor.execute("create table if not exists songs(" +
-        "file text, listened int, added int, karma real, time int" +
-        ");")
-    db.commit()
     for song in client.list("file"):
       allsongs.append(unicode(song, enc))
     for song in cursor.execute("select file from songs;"):
@@ -144,14 +138,47 @@ def updateone():
     cursor.execute("delete from songs where file=?", (song,))
     db.commit()
 
+def getSetting(name):
+  cursor.execute("""SELECT value FROM setting
+      WHERE name = ?;""", (name,))
+  one = cursor.fetchone()
+  if not one: return None
+  return one[0]
 
+def setSetting(name, val):
+  cursor.execute("""INSERT INTO setting (name, value)
+      VALUES (?, ?);""", (name, val))
+  db.commit()
+
+def initDB():
+    cursor.execute("""CREATE TABLE IF NOT EXISTS setting(
+        name text not null,
+        value text
+        );""")
+    cursor.execute("""CREATE TABLE IF NOT EXISTS songs(
+        file text,
+        listened int,
+        added int,
+        karma real,
+        time int
+        );""")
+    db.commit()
+    dbversion = getSetting("dbversion")
+    if not dbversion:
+      setSetting("dbversion", "1")
+    #if int(dbversion) < 2: blah blah upgrade
+    #db.commit()
 
 def serve():
   global client, db, cursor
 
+  fifo = os.fdopen(os.open(datahome + "/fifo",
+              os.O_RDONLY | os.O_NONBLOCK))
+
   db = sqlite3.connect((datahome+"/db.sqlite").encode(enc))
   cursor = db.cursor()
-  cursor.execute("vacuum;")
+  initDB()
+  cursor.execute("VACUUM;")
 
 
   random.seed()
@@ -173,18 +200,12 @@ def serve():
   delay = mindelay
   radioMode = True
 
-
   log("N Ready")
-
-  #fifo = open(datahome + "/fifo")
-  fifo = os.fdopen(os.open(datahome + "/fifo",
-              os.O_RDONLY | os.O_NONBLOCK))
-
 
   while True:
 
     try:
-    updateone()
+      updateone()
       if radioMode:
         if client.status()["consume"] == "0":
           cursongid = client.status()["songid"]
@@ -249,17 +270,17 @@ def getServFifo():
     pidf.close()
     os.kill(int(pid), 0) #OSError on kill, ValueError on int
   except (IOError, OSError, ValueError):
-    log("N Starting server", True)
+    log("N Starting server...", True)
+    try:
+      os.mkfifo(datahome + "/fifo")
+    except OSError:
+      pass
     pid = os.fork()
     if pid == 0:
       serve()
     pidf = open(datahome + "/pid", "w")
     pidf.write(str(pid))
     pidf.close()
-  try:
-    os.mkfifo(datahome + "/fifo")
-  except OSError:
-    pass
 
   f = open(datahome + "/fifo", "w+")
   return f
