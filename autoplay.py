@@ -138,9 +138,9 @@ def updateone():
         (song,))
     db.commit()
 
-  # Check if the file exists
-  if not os.path.isfile((os.path.expanduser(musicdir) + "/" +
-    song).encode(enc)):
+  # Check if the file is in mpd
+  if len(client.search("filename", song.encode(enc))) == 0:
+    log("D "+song.encode(enc)+" doesn't exist?")
     cursor.execute("delete from songs where file=?", (song,))
     db.commit()
 
@@ -169,8 +169,9 @@ def serve():
   for i in range(5):
     updateone()
 
-  armed = 1
+  armed = True
   delay = mindelay
+  radioMode = True
 
 
   log("N Ready")
@@ -184,27 +185,27 @@ def serve():
     updateone()
 
     try:
-      if client.status()["consume"] == "0":
-        cursongid = client.status()["songid"]
-        for song in client.playlistid():
-          if song["id"] == cursongid:
-            neededlength = int(song["pos"]) + trigger
+      if radioMode:
+        if client.status()["consume"] == "0":
+          cursongid = client.status()["songid"]
+          for song in client.playlistid():
+            if song["id"] == cursongid:
+              neededlength = int(song["pos"]) + trigger
+        else:
+          neededlength = trigger
+        if len(client.playlist()) < neededlength:
+          addsong()
+          delay = mindelay
 
-      else:
-        neededlength = trigger
-
-      if len(client.playlist()) < neededlength:
-        addsong()
-        delay = mindelay
       if client.status()['state'] == "play":
         times = client.status()['time'].split(":")
         pos = int(times[0])
         end = int(times[1])
         currentsong = client.currentsong()
-        if armed == 0 and "id" in currentsong and not songid == currentsong["id"]:
-          armed = 1
-        elif armed == 1 and (end > mintime) and (pos > playtime*end/100):
-          armed = 0 # Disarm until the next song
+        if not armed and "id" in currentsong and not songid == currentsong["id"]:
+          armed = True
+        elif armed and (end > mintime) and (pos > playtime*end/100):
+          armed = False # Disarm until the next song
           listened(getsong(unicode(currentsong["file"], enc)))
           songid = (currentsong["id"])
 
@@ -225,6 +226,15 @@ def serve():
         os.unlink(datahome + "/pid")
         log("N Quit")
         exit(0)
+      elif comm == "stop\n":
+        radioMode = False
+        log("D Radio mode disabled")
+      elif comm == "start\n":
+        radioMode = True
+        log("D Radio mode enabled")
+      elif comm == "toggle\n":
+        radioMode = not radioMode
+        log("D Radio mode toggled")
       else: log("W Unknown command : " + comm[:-1])
 
 
@@ -274,8 +284,7 @@ if(atloc != -1):
   host = host[atloc+1:]
 
 port = os.getenv("MPD_PORT", "6600")
-#musicdir = os.getenv("MPD_MUSIC_DIR") or os.getenv("mpd_music_dir") \
-#    or os.getenv("HOME") + "/music"
+#musicdir = os.getenv("MPD_MUSIC_DIR") or os.getenv("mpd_music_dir")
 
 
 logio = io.open(logfile, "at", buffering=1, encoding=enc)
