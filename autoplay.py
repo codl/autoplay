@@ -25,16 +25,16 @@ mintime = 25 # Minimum length of a track for it
              #  to be considered a song (in seconds)
 flood_delay = 12*60 # Minutes to wait before adding the same song again
 tries = 10 # Retry connecting this many times
-
-logfile = "/tmp/autoplay.log"
 ## /Config
 
 version = "2.0 DEV"
 helpstring = """Syntax : autoplay [command]
 command can be one of :
-  radio (on|off|toggle)
+  radio [on|off|toggle]
   trigger (number)
+
   kill
+  loglevel [debug|notice|warning|error]
   help
   version"""
 
@@ -44,9 +44,12 @@ enc = "UTF-8"
 ## Functions
 def log(msg, stdout=False):
   """Logs to file, and optionally to stdout. Obvious enough"""
+  alllevels = "DNWE" # Debug, Notice, Warning, Error
+  loglevels = alllevels[alllevels.find(logLevel):]
   if stdout:
     print msg[2:]
-  logio.write(unicode(msg, enc)+"\n")
+  if msg[0] in loglevels:
+    logio.write(unicode(msg, enc)+"\n")
 
 def connect(i=1):
   log("N Connecting...")
@@ -197,12 +200,12 @@ def triggerStatus():
   return "Trigger : " + str(trigger) + "\n"
 
 def radioStatus():
-  return "Radio mode: " +\
+  return "Radio mode : " +\
     ("Enabled" if radioMode else "Disabled") + "\n"
 
 def serve():
   global client, db, cursor, s
-  global trigger, radioMode
+  global trigger, radioMode, logLevel
 
   s = socket.socket(socket.AF_UNIX)
   s.bind(datahome + "/socket")
@@ -214,6 +217,7 @@ def serve():
   initDB()
   cursor.execute("VACUUM;")
 
+  logLevel = getSetting("logLevel", "W")
 
   random.seed()
   client = mpd.MPDClient()
@@ -287,11 +291,11 @@ def serve():
             c.close()
             shutdown()
             exit(0)
-          elif comm[:6] == "radio ":
+          elif comm[:5] == "radio":
             if comm[6:] in ("off", "no", "stop"): radioMode = False
             elif comm[6:] in ("on", "yes", "start"): radioMode = True
             elif comm[6:] == "toggle": radioMode = not radioMode
-            else: c.send("Syntax: autoplay radio (on|off|toggle)\n")
+            elif comm[5:6] == " ": c.send("Syntax: autoplay radio [on|off|toggle]\n")
             c.send(radioStatus())
             setSetting("radioMode", str(radioMode))
           elif comm[:7] == "trigger":
@@ -299,8 +303,20 @@ def serve():
               trigger = int(comm[8:])
               setSetting("trigger", str(trigger))
             except ValueError:
-              c.send("\"" + comm[8:] + "\" is not a valid number")
+              if comm[7:8] == " ":
+                c.send("\"" + comm[8:] + "\" is not a valid number")
             c.send(triggerStatus())
+
+          elif comm[:8] == "loglevel":
+            if comm[9:].lower() in ("d", "debug"): logLevel = "D"
+            elif comm[9:].lower() in ("n", "notice"): logLevel = "N"
+            elif comm[9:].lower() in ("w", "warning"): logLevel = "W"
+            elif comm[9:].lower() in ("e", "error"): logLevel = "E"
+            elif comm[9:].lower() in ("on", "yes", "start"): radioMode = True
+            elif comm[8:9] == " ":
+              c.send("Syntax: autoplay loglevel [debug|notice|warning|error]\n")
+            c.send("Log level : " + logLevel + "\n")
+            setSetting("logLevel", logLevel)
 
           elif comm in ("help","-h","--help"):
             c.send(helpstring + "\n\n")
@@ -331,7 +347,6 @@ def getServSock():
     pidf.close()
     os.kill(int(pid), 0) #OSError on kill, ValueError on int
   except (IOError, OSError, ValueError):
-    log("N Starting server...", True)
     try:
       os.unlink(datahome + "/socket")
     except OSError:
@@ -371,7 +386,7 @@ port = os.getenv("MPD_PORT", "6600")
 #musicdir = os.getenv("MPD_MUSIC_DIR") or os.getenv("mpd_music_dir")
 
 
-logio = io.open(logfile, "at", buffering=1, encoding=enc)
+logio = io.open(datahome + "/log", "at", buffering=1, encoding=enc)
 
 
 
