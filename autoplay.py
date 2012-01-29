@@ -347,6 +347,7 @@ def getServSock():
     pidf.close()
     os.kill(int(pid), 0) #OSError on kill, ValueError on int
   except (IOError, OSError, ValueError):
+    print("Starting server...")
     try:
       os.unlink(datahome + "/socket")
     except OSError:

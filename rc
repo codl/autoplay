@@ -15,7 +15,6 @@ case "$1" in
   stop)
     stat_busy "Stopping Autoplay"
     su $runas -c "$bin kill > /dev/null 2>&1 &"
-    pkill -fx "python2 $bin"
     stat_done
   ;;
   restart)
