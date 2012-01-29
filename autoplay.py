@@ -27,17 +27,18 @@ playtime = 70 # Percentage of a song that must be played before
 mintime = 25 # Minimum length of a track for it
              #  to be considered a song (in seconds)
 flood_delay = 12*60 # Minutes to wait before adding the same song again
-mindelay = 0.1 # These are the min and max polling delays
-maxdelay = 1.0 # These values should be sane for pretty much any
-               # remotely recent computer. Increase them if cpu usage
-               # is too high
 tries = 10 # Retry connecting this many times
 
 logfile = "/tmp/autoplay.log"
 ## /Config
 
 version = "2.0 DEV"
-helpstring = """lol no help for you"""
+helpstring = """Syntax : autoplay [command]
+command can be one of :
+  radio on|off|toggle
+  kill
+  help
+  version"""
 
 #enc = sys.getfilesystemencoding()
 enc = "UTF-8"
@@ -60,6 +61,14 @@ def connect(i=1):
     log("N Try n°"+str(i)+" failed")
     time.sleep(i*3)
     connect(i+1)
+    return
+  if password:
+    try:
+      log("D Using password")
+      client.password(password)
+    except mpd.CommandError:
+      log("E Couldn't connect. Wrong password?", stdout=True)
+      exit(2)
   log("N Connected")
 
 
@@ -115,6 +124,7 @@ def listened(songdata):
       "update songs set listened=?, karma=?, time=? where file=?",
       (songdata[1]+1, newkarma, int(time.time()), songdata[0])
       )
+  log("D Listened to " + songdata[0].encode(enc))
   db.commit()
 ## /Functions
 
@@ -128,6 +138,7 @@ def updateone():
     random.shuffle(allsongs)
 
   song = allsongs.pop()
+  log("D Updating " + song.encode(enc))
   # Check if the file is in DB
   cursor.execute("select * from songs where file=?", (song,))
   if cursor.fetchone() == None:
@@ -175,6 +186,7 @@ def initDB():
 def shutdown():
   s.shutdown(socket.SHUT_RDWR)
   s.close()
+  os.unlink(datahome + "/socket")
   client.disconnect()
   os.unlink(datahome + "/pid")
   log("N Shutdown")
@@ -197,20 +209,11 @@ def serve():
   client = mpd.MPDClient()
   connect()
 
-  if password:
-    try:
-      log("D Using password")
-      client.password(password)
-    except mpd.CommandError:
-      log("E Couldn't connect. Wrong password?", stdout=True)
-      exit(2)
-
-  for i in range(5):
-    updateone()
-
   armed = True
-  delay = mindelay
   radioMode = True
+
+  lastUpdate = time.time()
+  lastMpd = time.time()
 
   log("N Ready")
 
@@ -218,30 +221,35 @@ def serve():
 
     try: #KeyboardInterrupt
       try: #MPD or socket error
-        updateone()
-        if radioMode:
-          if client.status()["consume"] == "0":
-            cursongid = client.status()["songid"]
-            for song in client.playlistid():
-              if song["id"] == cursongid:
-                neededlength = int(song["pos"]) + trigger
-          else:
-            neededlength = trigger
-          if len(client.playlist()) < neededlength:
-            addsong()
-            delay = mindelay
+        clock = time.time()
+        if clock - lastUpdate >= 20:
+          lastUpdate = clock
+          updateone()
+        if clock - lastMpd >= .5:
+          lastMpd = clock
+          if radioMode:
+            if client.status()["consume"] == "0":
+              cursongid = client.status()["songid"]
+              for song in client.playlistid():
+                if song["id"] == cursongid:
+                  neededlength = int(song["pos"]) + trigger
+            else:
+              neededlength = trigger
+            if len(client.playlist()) < neededlength:
+              addsong()
+              lastMpd = 0
 
-        if client.status()['state'] == "play":
-          times = client.status()['time'].split(":")
-          pos = int(times[0])
-          end = int(times[1])
-          currentsong = client.currentsong()
-          if not armed and "id" in currentsong and not songid == currentsong["id"]:
-            armed = True
-          elif armed and (end > mintime) and (pos > playtime*end/100):
-            armed = False # Disarm until the next song
-            listened(getsong(unicode(currentsong["file"], enc)))
-            songid = (currentsong["id"])
+          if client.status()['state'] == "play":
+            times = client.status()['time'].split(":")
+            pos = int(times[0])
+            end = int(times[1])
+            currentsong = client.currentsong()
+            if not armed and "id" in currentsong and not songid == currentsong["id"]:
+              armed = True
+            elif armed and (end > mintime) and (pos > playtime*end/100):
+              armed = False # Disarm until the next song
+              listened(getsong(unicode(currentsong["file"], enc)))
+              songid = (currentsong["id"])
 
       except KeyError:
         pass
@@ -261,7 +269,6 @@ def serve():
           pass
         c.setblocking(1)
         if len(comm) != 0:
-          delay = mindelay
           if comm == "kill":
             c.send("Shutting down server...\n")
             c.shutdown(socket.SHUT_RD)
@@ -278,9 +285,9 @@ def serve():
             radioMode = not radioMode
             log("D Radio mode toggled")
           elif comm in ("help","-h","--help"):
-            c.send(helpstring)
+            c.send(helpstring + "\n\n")
           elif comm in ("version", "-V"):
-            c.send("Autoplay v" + version + " running\n")
+            c.send("Autoplay v" + version + "\n")
           else:
             log("W Unknown command : " + comm)
             c.send("Unknown command : " + comm + "\n")
@@ -292,8 +299,7 @@ def serve():
       except socket.error:
         pass
 
-      time.sleep(delay)
-      delay = min((delay*1.1, maxdelay))
+      time.sleep(0.2)
 
     except KeyboardInterrupt:
       s.shutdown(socket.SHUT_RDWR)
@@ -307,14 +313,18 @@ def getServSock():
     os.kill(int(pid), 0) #OSError on kill, ValueError on int
   except (IOError, OSError, ValueError):
     log("N Starting server...", True)
+    try:
+      os.unlink(datahome + "/socket")
+    except OSError:
+      pass
     pid = os.fork()
     if pid == 0:
       serve()
     pidf = open(datahome + "/pid", "w")
     pidf.write(str(pid))
     pidf.close()
+    time.sleep(1)
 
-  time.sleep(2)
   s = socket.socket(socket.AF_UNIX)
   s.connect(datahome + "/socket")
   return s
