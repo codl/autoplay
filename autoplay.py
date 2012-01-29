@@ -19,10 +19,6 @@ import socket
 import signal
 
 ## Config
-radioMode = True
-trigger = 8 # A new song will be added when the playlist
-            #  has less songs than this
-            #  You can set this to 0 if you only want the stats
 playtime = 70 # Percentage of a song that must be played before
               #  play count is incremented
 mintime = 25 # Minimum length of a track for it
@@ -154,16 +150,20 @@ def updateone():
     cursor.execute("delete from songs where file=?", (song,))
     db.commit()
 
-def getSetting(name):
+def getSetting(name, default=None):
   cursor.execute("""SELECT value FROM setting
       WHERE name = ?;""", (name,))
   one = cursor.fetchone()
-  if not one: return None
+  if not one: return default
   return one[0]
 
 def setSetting(name, val):
-  cursor.execute("""INSERT INTO setting (name, value)
+  if getSetting(name) == None:
+    cursor.execute("""INSERT INTO setting (name, value)
       VALUES (?, ?);""", (name, val))
+  else:
+    cursor.execute("""UPDATE setting SET value = ?
+      WHERE name = ?;""", (val, name))
   db.commit()
 
 def initDB():
@@ -201,7 +201,8 @@ def radioStatus():
     ("Enabled" if radioMode else "Disabled") + "\n"
 
 def serve():
-  global client, db, cursor, s, trigger, radioMode
+  global client, db, cursor, s
+  global trigger, radioMode
 
   s = socket.socket(socket.AF_UNIX)
   s.bind(datahome + "/socket")
@@ -218,10 +219,13 @@ def serve():
   client = mpd.MPDClient()
   connect()
 
-  lastUpdate = time.time()
-  lastMpd = time.time()
+  radioMode = getSetting("radioMode", "True") == "True"
+  trigger = int(getSetting("trigger", 6))
 
   armed = True
+
+  lastUpdate = time.time()
+  lastMpd = time.time()
 
   log("N Ready")
 
@@ -283,18 +287,16 @@ def serve():
             c.close()
             shutdown()
             exit(0)
-          elif comm == "radio off":
-            radioMode = False
+          elif comm[:6] == "radio ":
+            if comm[6:] in ("off", "no", "stop"): radioMode = False
+            elif comm[6:] in ("on", "yes", "start"): radioMode = True
+            elif comm[6:] == "toggle": radioMode = not radioMode
             c.send(radioStatus())
-          elif comm == "radio on":
-            radioMode = True
-            c.send(radioStatus())
-          elif comm == "radio toggle":
-            radioMode = not radioMode
-            c.send(radioStatus())
+            setSetting("radioMode", str(radioMode))
           elif comm[:7] == "trigger":
             try:
               trigger = int(comm[8:])
+              setSetting("trigger", str(trigger))
             except ValueError:
               c.send("\"" + comm[8:] + "\" is not a valid number")
             c.send(triggerStatus())
@@ -378,7 +380,7 @@ if len(sys.argv) > 1:
 
 data = s.recv(1024)
 while data != "":
-  print(data)
+  print data,
   data = s.recv(1024)
 
 
