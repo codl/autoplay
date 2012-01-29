@@ -24,30 +24,6 @@ read USER
 
 sed -i "s|~|$(su $USER -c 'printf $HOME')|" /tmp/rc
 
-if [[ $(sed -n "/localhost/p" /tmp/autoplay) != '' ]]; then
-  printf "MPD server?\n(Default : localhost) > "
-  read SERVER
-  [[ $SERVER != "" ]] && sed -i "s/localhost/$SERVER/" /tmp/autoplay
-fi
-
-if [[ $(sed -n "/port.*6600/p" /tmp/autoplay) != '' ]]; then
-  printf "MPD port?\n(Default : 6600) > "
-  read PORT
-  [[ $PORT != "" ]] && sed -i "/port/s/6600/$PORT/" /tmp/autoplay
-fi
-
-if [[ $(sed -n "/pass.*False.*#/p" /tmp/autoplay) != '' ]]; then
-  printf "MPD password?\n(Default : None) > "
-  read PASS
-  [[ $PASS != "" ]] && sed -i "/pass/s/False/$PASS/1" /tmp/autoplay
-fi
-
-if [[ $(sed -n "/\~\/music/p" /tmp/autoplay) != '' ]]; then
-  printf "Where is your music located?\n(Default : ~/music) > "
-  read DB
-  [[ $DB != "" ]] && sed -i "s|~/music|$DB|" /tmp/autoplay
-fi
-
 mv /tmp/autoplay $BIN/autoplay
 
 printf "Where is your rc.d or init.d directory?\n(Default : /etc/rc.d, /etc/init.d, or none) > "
@@ -57,7 +33,7 @@ read DOTD
 [[ $DOTD == "" ]] || [[ ! -d $DOTD ]] && printf "Could not find rc.d or init.d directory. rc script will not be installed\n" && DOTD=""
 
 echo "Done! Autoplay has been installed to $BIN/autoplay :)"
-echo "You might want to run 'autoplay -u' before running autoplay if this is your first time using autoplay to build the database"
+echo "It will connect to the server specified in \$MPD_HOST and \$MPD_PORT, or localhost:6600 by default"
 
 if [[ $DOTD != "" ]]; then
   mv /tmp/rc $DOTD/autoplay

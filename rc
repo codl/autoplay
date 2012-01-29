@@ -9,11 +9,12 @@ runas="mpd"
 case "$1" in
   start)
     stat_busy "Starting Autoplay"
-    su $runas -c "$bin > /dev/null &>> /tmp/autoplay.log &"
+    su $runas -c "$bin > /dev/null &>> 2>&1 &"
     stat_done
   ;;
   stop)
     stat_busy "Stopping Autoplay"
+    su $runas -c "$bin kill > /dev/null 2>&1 &"
     pkill -fx "python2 $bin"
     stat_done
   ;;
@@ -21,22 +22,8 @@ case "$1" in
     $0 stop
     $0 start
   ;;
-  update)
-    if [[ $(pgrep -fx "python2 $bin") -ne 0 ]]
-    then
-      running=1
-      $0 stop
-    fi
-    stat_busy "Updating Autoplay database"
-    su $runas -c "$bin -u > /dev/null &>> /tmp/autoplay.log"
-    stat_done
-    if [[ $running -eq 1 ]]
-    then
-      $0 start
-    fi
-  ;;
   *)
-    echo "usage: $0 {start|stop|restart|update}"
+    echo "usage: $0 {start|stop|restart}"
 	;;
 esac
 exit 0
