@@ -10,11 +10,9 @@ Dependencies
 
 * [python 2.6][python]
 * [python-mpd][pympd]
-* [pysqlite][]
 
 [python]: http://python.org/
 [pympd]: http://jatreuman.indefero.net/p/python-mpd/
-[pysqlite]: http://code.google.com/p/pysqlite/
 
 Usage
 -----
