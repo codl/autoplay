@@ -19,6 +19,7 @@ import socket
 import signal
 
 ## Config
+radioMode = True
 trigger = 8 # A new song will be added when the playlist
             #  has less songs than this
             #  You can set this to 0 if you only want the stats
@@ -35,7 +36,8 @@ logfile = "/tmp/autoplay.log"
 version = "2.0 DEV"
 helpstring = """Syntax : autoplay [command]
 command can be one of :
-  radio on|off|toggle
+  radio (on|off|toggle)
+  trigger (number)
   kill
   help
   version"""
@@ -191,8 +193,15 @@ def shutdown():
   os.unlink(datahome + "/pid")
   log("N Shutdown")
 
+def triggerStatus():
+  return "Trigger : " + str(trigger) + "\n"
+
+def radioStatus():
+  return "Radio mode: " +\
+    ("Enabled" if radioMode else "Disabled") + "\n"
+
 def serve():
-  global client, db, cursor, s
+  global client, db, cursor, s, trigger, radioMode
 
   s = socket.socket(socket.AF_UNIX)
   s.bind(datahome + "/socket")
@@ -209,11 +218,10 @@ def serve():
   client = mpd.MPDClient()
   connect()
 
-  armed = True
-  radioMode = True
-
   lastUpdate = time.time()
   lastMpd = time.time()
+
+  armed = True
 
   log("N Ready")
 
@@ -277,13 +285,20 @@ def serve():
             exit(0)
           elif comm == "radio off":
             radioMode = False
-            log("D Radio mode disabled")
+            c.send(radioStatus())
           elif comm == "radio on":
             radioMode = True
-            log("D Radio mode enabled")
+            c.send(radioStatus())
           elif comm == "radio toggle":
             radioMode = not radioMode
-            log("D Radio mode toggled")
+            c.send(radioStatus())
+          elif comm[:7] == "trigger":
+            try:
+              trigger = int(comm[8:])
+            except ValueError:
+              c.send("\"" + comm[8:] + "\" is not a valid number")
+            c.send(triggerStatus())
+
           elif comm in ("help","-h","--help"):
             c.send(helpstring + "\n\n")
           elif comm in ("version", "-V"):
@@ -292,8 +307,9 @@ def serve():
             log("W Unknown command : " + comm)
             c.send("Unknown command : " + comm + "\n")
             c.send(helpstring + "\n")
-        c.send("Radio mode: " +
-            ("Enabled" if radioMode else "Disabled") + "\n")
+        else:
+          c.send(radioStatus())
+          if radioMode: c.send(triggerStatus())
         c.shutdown(socket.SHUT_RD)
         c.close()
       except socket.error:
