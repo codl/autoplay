@@ -291,6 +291,7 @@ def serve():
             if comm[6:] in ("off", "no", "stop"): radioMode = False
             elif comm[6:] in ("on", "yes", "start"): radioMode = True
             elif comm[6:] == "toggle": radioMode = not radioMode
+            else: c.send("Syntax: autoplay radio (on|off|toggle)\n")
             c.send(radioStatus())
             setSetting("radioMode", str(radioMode))
           elif comm[:7] == "trigger":
