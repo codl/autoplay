@@ -31,15 +31,15 @@ version = "2.0 DEV"
 helpstring = """Syntax : autoplay [command]
 command can be one of :
   radio [on|off|toggle]
-  trigger (number)
+  trigger [number]
 
   kill
   loglevel [debug|notice|warning|error]
   help
   version"""
 
-#enc = sys.getfilesystemencoding()
-enc = "UTF-8"
+enc = sys.getfilesystemencoding()
+#enc = "UTF-8"
 
 ## Functions
 def log(msg, stdout=False):
@@ -91,16 +91,20 @@ def addsong():
         (songdata[2]+1, newkarma, int(time.time()), songdata[0],)
         )
     db.commit()
-    client.add(songdata[0].encode(enc))
+    try:
+      client.add(songdata[0].encode(enc))
+      log("D Added " + songdata[0].encode(enc))
+    except mpd.CommandError:
+      update(songdata[0])
+      addsong()
 
 def getsong(songfile):
   """Retrieve song data from DB"""
   cursor.execute("select * from songs where file=?", (songfile,))
   data = cursor.fetchone()
   if data == None:
-    cursor.execute("insert into songs values (?, 0, 0, 0.5, 0)",
-        (songfile,))
-    data = (songfile, 0, 0, 0.5, 0)
+    update(songfile)
+    data = (songfile, 0, 0, 5, 0)
   return data
 
 def karma(songdata, which=0):
@@ -139,19 +143,50 @@ def updateone():
     random.shuffle(allsongs)
 
   song = allsongs.pop()
-  log("D Updating " + song.encode(enc))
+  update(song)
+
+def update(song):
+  # Check if the file is in mpd
+  records = client.search("filename", song.encode(enc))
+  if not any(unicode(r['file'], enc) == song for r in records):
+    log("N Update : Removing " + song.encode(enc))
+    cursor.execute("delete from songs where file=?", (song,))
+    db.commit()
+    return
+
+  inode = dev = None
+  if musicdir:
+    # Check for duplicate in FS
+    try:
+      s = os.stat(musicdir + "/" + song.encode(enc))
+      inode = s.st_ino
+      dev = s.st_dev
+      cursor.execute("SELECT 1 FROM songs WHERE file!=? AND inode=?" +
+          "AND dev=?", (song, inode, dev))
+      if cursor.fetchone():
+        log("D " + song.encode(enc) +
+            " (Inode : " + str(inode) + ", Device : " + str(dev) +
+            ") already exists in DB")
+        cursor.execute("DELETE FROM songs WHERE file=?", (song,))
+        return
+      else:
+        cursor.execute("UPDATE songs SET inode=?, dev=? WHERE file=?",
+            (inode, dev, song))
+    except OSError:
+      pass
+
   # Check if the file is in DB
   cursor.execute("select * from songs where file=?", (song,))
   if cursor.fetchone() == None:
-    cursor.execute("insert into songs values (?, 0, 0, 5, 0);",
-        (song,))
+    log("N Update : Adding " + song.encode(enc))
+    cursor.execute("INSERT INTO songs"+
+        "(file, listened, added, karma, time, inode, dev)"+
+        "VALUES (?, 0, 0, 5, 0, ?, ?);",
+        (song, inode, dev))
     db.commit()
+    return
 
-  # Check if the file is in mpd
-  if len(client.search("filename", song.encode(enc))) == 0:
-    log("D "+song.encode(enc)+" doesn't exist?")
-    cursor.execute("delete from songs where file=?", (song,))
-    db.commit()
+
 
 def getSetting(name, default=None):
   cursor.execute("""SELECT value FROM setting
@@ -179,14 +214,22 @@ def initDB():
         listened int,
         added int,
         karma real,
-        time int
+        time int,
+        inode int,
+        dev int
         );""")
     db.commit()
     dbversion = getSetting("dbversion")
-    if not dbversion:
+    cursor.execute("""SELECT 1 FROM songs LIMIT 1;""")
+    if cursor.fetchone() and not dbversion: # old db
       setSetting("dbversion", "1")
-    #if int(dbversion) < 2: blah blah upgrade
-    #db.commit()
+    elif not dbversion:
+      setSetting("dbversion", "2")
+    elif int(dbversion) < 2:
+      cursor.execute("""ALTER TABLE songs ADD COLUMN inode int;""");
+      cursor.execute("""ALTER TABLE songs ADD COLUMN dev int;""");
+      setSetting("dbversion", "2")
+    db.commit()
 
 def shutdown():
   s.shutdown(socket.SHUT_RDWR)
@@ -206,6 +249,7 @@ def radioStatus():
 def serve():
   global client, db, cursor, s
   global trigger, radioMode, logLevel
+  global allsongs
 
   s = socket.socket(socket.AF_UNIX)
   s.bind(datahome + "/socket")
@@ -218,64 +262,26 @@ def serve():
   cursor.execute("VACUUM;")
 
   logLevel = getSetting("logLevel", "W")
+  radioMode = getSetting("radioMode", "True") == "True"
+  trigger = int(getSetting("trigger", 6))
 
   random.seed()
   client = mpd.MPDClient()
   connect()
 
-  radioMode = getSetting("radioMode", "True") == "True"
-  trigger = int(getSetting("trigger", 6))
-
   armed = True
 
-  lastUpdate = time.time()
+  lastUpdate = 0
   lastMpd = time.time()
+
+  log("D Music dir is located at " + str(musicdir))
 
   log("N Ready")
 
   while True:
 
     try: #KeyboardInterrupt
-      try: #MPD or socket error
-        clock = time.time()
-        if clock - lastUpdate >= 20:
-          lastUpdate = clock
-          updateone()
-        if clock - lastMpd >= .5:
-          lastMpd = clock
-          if radioMode:
-            if client.status()["consume"] == "0":
-              cursongid = client.status()["songid"]
-              for song in client.playlistid():
-                if song["id"] == cursongid:
-                  neededlength = int(song["pos"]) + trigger
-            else:
-              neededlength = trigger
-            if len(client.playlist()) < neededlength:
-              addsong()
-              lastMpd = 0
-
-          if client.status()['state'] == "play":
-            times = client.status()['time'].split(":")
-            pos = int(times[0])
-            end = int(times[1])
-            currentsong = client.currentsong()
-            if not armed and "id" in currentsong and not songid == currentsong["id"]:
-              armed = True
-            elif armed and (end > mintime) and (pos > playtime*end/100):
-              armed = False # Disarm until the next song
-              listened(getsong(unicode(currentsong["file"], enc)))
-              songid = (currentsong["id"])
-
-      except KeyError:
-        pass
-
-      except (socket.error, mpd.ConnectionError):
-        log("W Connection to MPD lost")
-        client.disconnect()
-        connect()
-
-      try:
+      try: #Socket error
         c, _ = s.accept()
         c.settimeout(0.2)
         comm = ""
@@ -318,6 +324,21 @@ def serve():
             c.send("Log level : " + logLevel + "\n")
             setSetting("logLevel", logLevel)
 
+          elif comm[:6] == "update":
+            if comm[7:] == "all":
+              c.send("This may be *very* long, depending on the size of your"
+                  + " library.\n")
+              allsongs = []
+              updateone()
+              c.send(str(len(allsongs) + 1) + " songs to update\n\n" )
+              while allsongs != []:
+                if len(allsongs) % 200 == 0:
+                  c.send(str(len(allsongs)) + " remaining...\n")
+                updateone()
+              c.send("Done")
+            else:
+              update(unicode(comm[7:],enc))
+
           elif comm in ("help","-h","--help"):
             c.send(helpstring + "\n\n")
           elif comm in ("version", "-V"):
@@ -333,6 +354,45 @@ def serve():
         c.close()
       except socket.error:
         pass
+
+      try: #MPD or socket error
+        clock = time.time()
+        if clock - lastUpdate >= 5:
+          lastUpdate = clock
+          updateone()
+        if clock - lastMpd >= .5:
+          lastMpd = clock
+          if radioMode:
+            if client.status()["consume"] == "0":
+              cursongid = client.status()["songid"]
+              for song in client.playlistid():
+                if song["id"] == cursongid:
+                  neededlength = int(song["pos"]) + trigger
+            else:
+              neededlength = trigger
+            if len(client.playlist()) < neededlength:
+              addsong()
+              lastMpd = 0
+
+          if client.status()['state'] == "play":
+            times = client.status()['time'].split(":")
+            pos = int(times[0])
+            end = int(times[1])
+            currentsong = client.currentsong()
+            if not armed and "id" in currentsong and not songid == currentsong["id"]:
+              armed = True
+            elif armed and (end > mintime) and (pos > playtime*end/100):
+              armed = False # Disarm until the next song
+              listened(getsong(unicode(currentsong["file"], enc)))
+              songid = (currentsong["id"])
+
+      except KeyError:
+        pass
+
+      except (socket.error, mpd.ConnectionError):
+        log("W Connection to MPD lost")
+        client.disconnect()
+        connect()
 
       time.sleep(0.2)
 
@@ -384,7 +444,7 @@ if(atloc != -1):
   host = host[atloc+1:]
 
 port = os.getenv("MPD_PORT", "6600")
-#musicdir = os.getenv("MPD_MUSIC_DIR") or os.getenv("mpd_music_dir")
+musicdir = os.getenv("MPD_MUSIC_DIR") or os.getenv("mpd_music_dir")
 
 
 logio = io.open(datahome + "/log", "at", buffering=1, encoding=enc)
