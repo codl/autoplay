@@ -137,6 +137,7 @@ def listened(songdata):
 allsongs = []
 def updateone():
   if allsongs == []:
+    cursor.execute("VACUUM;")
     for song in client.list("file"):
       allsongs.append(unicode(song, enc))
     for song in cursor.execute("select file from songs;"):
