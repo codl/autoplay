@@ -18,8 +18,24 @@ Usage
 -----
 
 ```
-autoplay [kill]
+autoplay.py [command]
+command can be one of :
+  radio [on|off|toggle]
+  trigger [number]
+
+  start
+  kill
+  loglevel [debug|notice|warning|error]
+  help
+  version
 ```
+
+To have autoplay start automatically, you may add `autoplay.py start > /dev/null &` to your `.profile` or `.bash_profile`
+
+Installation
+------------
+
+Make sure you have all dependencies installed, then put `autoplay.py` anywhere in your `$PATH`.
 
 Configuration
 -------------
@@ -28,7 +44,7 @@ Autoplay will connect to the server according to environment variables `MPD_HOST
 The defaults are :
 
 ```sh
-MPD_HOST="127.0.0.1"""
+MPD_HOST="127.0.0.1"
 MPD_PORT="6600"
 ```
 
