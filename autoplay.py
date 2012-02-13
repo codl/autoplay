@@ -33,6 +33,7 @@ command can be one of :
   radio [on|off|toggle]
   trigger [number]
 
+  start
   kill
   loglevel [debug|notice|warning|error]
   help
@@ -357,7 +358,7 @@ def serve():
 
       try: #MPD or socket error
         clock = time.time()
-        if clock - lastUpdate >= 5:
+        if clock - lastUpdate >= 20:
           lastUpdate = clock
           updateone()
         if clock - lastMpd >= .5:
@@ -451,13 +452,18 @@ logio = io.open(datahome + "/log", "at", buffering=1, encoding=enc)
 
 
 
+silent = False
 s = getServSock()
 if len(sys.argv) > 1:
-  s.send(" ".join(sys.argv[1:]))
+  if sys.argv[1] == "start":
+    silent = True
+  else:
+    s.send(" ".join(sys.argv[1:]))
 
 data = s.recv(1024)
 while data != "":
-  print data,
+  if not silent:
+    print data,
   data = s.recv(1024)
 
 
