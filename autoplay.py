@@ -28,7 +28,7 @@ tries = 10 # Retry connecting this many times
 ## /Config
 
 version = "2.0 DEV"
-helpstring = """Syntax : autoplay [command]
+helpstring = """Syntax : """ + sys.argv[0] + """ [command]
 command can be one of :
   radio [on|off|toggle]
   trigger [number]
@@ -247,6 +247,85 @@ def radioStatus():
   return "Radio mode : " +\
     ("Enabled" if radioMode else "Disabled") + "\n"
 
+def sockAccept():
+  global client, db, cursor, s
+  global trigger, radioMode, logLevel
+  global allsongs
+
+  try: #Socket error
+    c, _ = s.accept()
+    c.settimeout(0.2)
+    comm = ""
+    try:
+      while True: comm += c.recv(1024)
+    except socket.error:
+      pass
+    c.setblocking(1)
+    if len(comm) != 0:
+      if comm == "kill":
+        c.send("Shutting down server...\n")
+        c.shutdown(socket.SHUT_RD)
+        c.close()
+        shutdown()
+        exit(0)
+      elif comm[:5] == "radio":
+        if comm[6:] in ("off", "no", "stop"): radioMode = False
+        elif comm[6:] in ("on", "yes", "start"): radioMode = True
+        elif comm[6:] == "toggle": radioMode = not radioMode
+        elif comm[5:6] == " ": c.send("Syntax: autoplay radio [on|off|toggle]\n")
+        c.send(radioStatus())
+        setSetting("radioMode", str(radioMode))
+      elif comm[:7] == "trigger":
+        try:
+          trigger = int(comm[8:])
+          setSetting("trigger", str(trigger))
+        except ValueError:
+          if comm[7:8] == " ":
+            c.send("\"" + comm[8:] + "\" is not a valid number")
+        c.send(triggerStatus())
+
+      elif comm[:8] == "loglevel":
+        if comm[9:].lower() in ("d", "debug"): logLevel = "D"
+        elif comm[9:].lower() in ("n", "notice"): logLevel = "N"
+        elif comm[9:].lower() in ("w", "warning"): logLevel = "W"
+        elif comm[9:].lower() in ("e", "error"): logLevel = "E"
+        elif comm[9:].lower() in ("on", "yes", "start"): radioMode = True
+        elif comm[8:9] == " ":
+          c.send("Syntax: autoplay loglevel [debug|notice|warning|error]\n")
+        c.send("Log level : " + logLevel + "\n")
+        setSetting("logLevel", logLevel)
+
+      elif comm[:6] == "update":
+        if comm[7:] == "all":
+          c.send("This may be *very* long, depending on the size of your"
+              + " library.\n")
+          allsongs = []
+          updateone()
+          c.send(str(len(allsongs) + 1) + " songs to update\n\n" )
+          while allsongs != []:
+            if len(allsongs) % 200 == 0:
+              c.send(str(len(allsongs)) + " remaining...\n")
+            updateone()
+          c.send("Done")
+        else:
+          update(unicode(comm[7:],enc))
+
+      elif comm in ("help","-h","--help"):
+        c.send(helpstring + "\n\n")
+      elif comm in ("version", "-V"):
+        c.send("Autoplay v" + version + "\n")
+      else:
+        log("W Unknown command : " + comm)
+        c.send("Unknown command : " + comm + "\n")
+        c.send(helpstring + "\n")
+    else:
+      c.send(radioStatus())
+      if radioMode: c.send(triggerStatus())
+    c.shutdown(socket.SHUT_RD)
+    c.close()
+  except socket.error:
+    pass
+
 def serve():
   global client, db, cursor, s
   global trigger, radioMode, logLevel
@@ -260,7 +339,6 @@ def serve():
   db = sqlite3.connect((datahome+"/db.sqlite").encode(enc))
   cursor = db.cursor()
   initDB()
-  cursor.execute("VACUUM;")
 
   logLevel = getSetting("logLevel", "W")
   radioMode = getSetting("radioMode", "True") == "True"
@@ -282,80 +360,7 @@ def serve():
   while True:
 
     try: #KeyboardInterrupt
-      try: #Socket error
-        c, _ = s.accept()
-        c.settimeout(0.2)
-        comm = ""
-        try:
-          while True: comm += c.recv(1024)
-        except socket.error:
-          pass
-        c.setblocking(1)
-        if len(comm) != 0:
-          if comm == "kill":
-            c.send("Shutting down server...\n")
-            c.shutdown(socket.SHUT_RD)
-            c.close()
-            shutdown()
-            exit(0)
-          elif comm[:5] == "radio":
-            if comm[6:] in ("off", "no", "stop"): radioMode = False
-            elif comm[6:] in ("on", "yes", "start"): radioMode = True
-            elif comm[6:] == "toggle": radioMode = not radioMode
-            elif comm[5:6] == " ": c.send("Syntax: autoplay radio [on|off|toggle]\n")
-            c.send(radioStatus())
-            setSetting("radioMode", str(radioMode))
-          elif comm[:7] == "trigger":
-            try:
-              trigger = int(comm[8:])
-              setSetting("trigger", str(trigger))
-            except ValueError:
-              if comm[7:8] == " ":
-                c.send("\"" + comm[8:] + "\" is not a valid number")
-            c.send(triggerStatus())
-
-          elif comm[:8] == "loglevel":
-            if comm[9:].lower() in ("d", "debug"): logLevel = "D"
-            elif comm[9:].lower() in ("n", "notice"): logLevel = "N"
-            elif comm[9:].lower() in ("w", "warning"): logLevel = "W"
-            elif comm[9:].lower() in ("e", "error"): logLevel = "E"
-            elif comm[9:].lower() in ("on", "yes", "start"): radioMode = True
-            elif comm[8:9] == " ":
-              c.send("Syntax: autoplay loglevel [debug|notice|warning|error]\n")
-            c.send("Log level : " + logLevel + "\n")
-            setSetting("logLevel", logLevel)
-
-          elif comm[:6] == "update":
-            if comm[7:] == "all":
-              c.send("This may be *very* long, depending on the size of your"
-                  + " library.\n")
-              allsongs = []
-              updateone()
-              c.send(str(len(allsongs) + 1) + " songs to update\n\n" )
-              while allsongs != []:
-                if len(allsongs) % 200 == 0:
-                  c.send(str(len(allsongs)) + " remaining...\n")
-                updateone()
-              c.send("Done")
-            else:
-              update(unicode(comm[7:],enc))
-
-          elif comm in ("help","-h","--help"):
-            c.send(helpstring + "\n\n")
-          elif comm in ("version", "-V"):
-            c.send("Autoplay v" + version + "\n")
-          else:
-            log("W Unknown command : " + comm)
-            c.send("Unknown command : " + comm + "\n")
-            c.send(helpstring + "\n")
-        else:
-          c.send(radioStatus())
-          if radioMode: c.send(triggerStatus())
-        c.shutdown(socket.SHUT_RD)
-        c.close()
-      except socket.error:
-        pass
-
+      sockAccept()
       try: #MPD or socket error
         clock = time.time()
         if clock - lastUpdate >= 20:
@@ -419,10 +424,12 @@ def getServSock():
     pidf = open(datahome + "/pid", "w")
     pidf.write(str(pid))
     pidf.close()
-    time.sleep(1)
 
   s = socket.socket(socket.AF_UNIX)
-  s.connect(datahome + "/socket")
+  try:
+    s.connect(datahome + "/socket")
+  except socket.error:
+    s = getServSock()
   return s
 
 
@@ -456,7 +463,10 @@ silent = False
 s = getServSock()
 if len(sys.argv) > 1:
   if sys.argv[1] == "start":
-    silent = True
+    if os.fork() == 0:
+      silent = True
+    else:
+      exit(0)
   else:
     s.send(" ".join(sys.argv[1:]))
 
