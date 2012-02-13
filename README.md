@@ -20,8 +20,8 @@ Usage
 ```
 autoplay.py [command]
 command can be one of :
-  radio [on|off|toggle]
-  trigger [number]
+  radio [on|off|toggle]     : switches between radio mode and stats-only mode
+  trigger [number]          : sets how many tracks must be in the playlist at all times
 
   start
   kill
@@ -57,4 +57,4 @@ Autoplay gives each song a *karma* rating based on how often it adds that song, 
 
 Usually, bad songs have karma under 0.25, *meh* songs have karma between 0.25 and 0.60, and good songs are over 0.60. A song that is often added by the user to the playlist will have a karma over 1.
 
-When a song is played, there is a *cooldown time* (default 12h) when autoplay cannot add it. This way, the same songs cannot be spammed over and over.
+When a song is played, there is a *cooldown time* (default 12h) during which autoplay cannot add it. This way, the same songs cannot be spammed over and over.
