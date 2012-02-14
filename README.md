@@ -8,7 +8,7 @@ a daemon that keeps your [MPD][] playlist filled with the music you actually lis
 Dependencies
 ------------
 
-* [python 2.6][python]
+* [python 2.x][python]
 * [python-mpd][pympd]
 
 [python]: http://python.org/
