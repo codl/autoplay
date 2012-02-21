@@ -1,7 +1,7 @@
 autoplay
 ========
 
-a daemon that keeps your [MPD][] playlist filled with the music you actually listen to
+a daemon that keeps your [MPD][] playlist filled with the music you actually listen to.
 
 [MPD]: http://mpd.wikia.com (Music Player Daemon)
 
@@ -20,7 +20,7 @@ Usage
 ```
 autoplay.py [command]
 command can be one of :
-  radio [on|off|toggle]     : switches between radio mode and stats-only mode
+  radio [on|off|toggle]     : switches between radio mode and stat collection only
   trigger [number]          : sets how many tracks must be in the playlist at all times
 
   start
@@ -30,7 +30,7 @@ command can be one of :
   version
 ```
 
-To have autoplay start automatically, you may add `autoplay.py start > /dev/null &` to your `.profile` or `.bash_profile`
+To have autoplay start automatically, you may add `autoplay.py start > /dev/null &` to your `.profile` or `.bash_profile`.
 
 Installation
 ------------
@@ -48,7 +48,9 @@ MPD_HOST="127.0.0.1"
 MPD_PORT="6600"
 ```
 
-A password can be used by setting `MPD_HOST="password@host"`.
+A password can be used by using the syntax `MPD_HOST="password@host"`.
+
+If the variable `MPD_DIR` is set, Autoplay will use it to flag symlinks or hardlinks as duplicates.
 
 How it works
 ------------
