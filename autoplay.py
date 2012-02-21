@@ -31,6 +31,7 @@ helpstring = """Syntax : """ + sys.argv[0] + """ [command]
 command can be one of :
   radio [on|off|toggle]
   trigger [number]
+  info [path]
 
   start
   kill
@@ -280,21 +281,28 @@ def radioStatus():
   return "Radio mode : " +\
     ("Enabled" if radioMode else "Disabled") + "\n"
 
-def pprintSong(song=None):
-  if not song:
+def pprintSong(file=None):
+  try:
+    if not file:
+      song = client.currentsong()
+    else:
+      song = client.find("file", file.encode(enc))[0]
+    cursor.execute("""SELECT listened, added, karma FROM songs
+      WHERE file = ?""", (song['file'],))
+    one = cursor.fetchone()
+    if not one:
+      return "\n"
+    prettysong = song['file']
     try:
-      song = client.currentsong()["file"]
-    except (KeyError, mpd.connectionError):
-      return "\n";
-  cursor.execute("""SELECT listened, added, karma FROM songs 
-    WHERE file = ?""", (song,))
-  one = cursor.fetchone()
-  if not one:
-    return "\n"
-  return song + """
+      prettysong = song['title']
+      prettysong = song['artist'] + " - " + prettysong
+    except KeyError: pass
+    return prettysong + """
 Listened : """ + str(one[0]) + """
 Added    : """ + str(one[1]) + """
 Karma    : """ + str(one[2]) + "\n"
+  except (IndexError, mpd.ConnectionError):
+    return "\n";
 
 def sockAccept():
   global client, db, cursor, s
