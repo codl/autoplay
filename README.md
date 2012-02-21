@@ -22,6 +22,7 @@ autoplay.py [command]
 command can be one of :
   radio [on|off|toggle]     : switches between radio mode and stat collection only
   trigger [number]          : sets how many tracks must be in the playlist at all times
+  info [filename]           : gives some info on the specified track, or the currently playing track
 
   start
   kill
