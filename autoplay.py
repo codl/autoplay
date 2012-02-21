@@ -280,6 +280,22 @@ def radioStatus():
   return "Radio mode : " +\
     ("Enabled" if radioMode else "Disabled") + "\n"
 
+def pprintSong(song=None):
+  if not song:
+    try:
+      song = client.currentsong()["file"]
+    except (KeyError, mpd.connectionError):
+      return "\n";
+  cursor.execute("""SELECT listened, added, karma FROM songs 
+    WHERE file = ?""", (song,))
+  one = cursor.fetchone()
+  if not one:
+    return "\n"
+  return song + """
+Listened : """ + str(one[0]) + """
+Added    : """ + str(one[1]) + """
+Karma    : """ + str(one[2]) + "\n"
+
 def sockAccept():
   global client, db, cursor, s
   global trigger, radioMode, logLevel
@@ -327,6 +343,10 @@ def sockAccept():
           c.send("Syntax: autoplay loglevel [debug|notice|warning|error]\n")
         c.send("Log level : " + logLevel + "\n")
         setSetting("logLevel", logLevel)
+
+      elif comm[:4] == "info":
+        if comm[4:] != "": c.send(pprintSong(comm[5:]))
+        else: c.send(pprintSong())
 
       elif comm[:6] == "update":
         if comm[7:] == "all":
@@ -394,6 +414,7 @@ def serve():
 
     try: #KeyboardInterrupt
       sockAccept()
+
       try: #MPD or socket error
         clock = time.time()
         if clock - lastUpdate >= 20:
