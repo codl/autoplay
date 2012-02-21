@@ -16,7 +16,6 @@ import time
 import io
 import sys
 import socket
-import signal
 
 ## Config
 playtime = 70 # Percentage of a song that must be played before
@@ -42,7 +41,6 @@ command can be one of :
 enc = sys.getfilesystemencoding()
 #enc = "UTF-8"
 
-## Functions
 def log(msg, stdout=False):
   """Logs to file, and optionally to stdout. Obvious enough"""
   alllevels = "DNWE" # Debug, Notice, Warning, Error
@@ -78,7 +76,7 @@ def addsong():
   """Adds a semi-random song to the playlist"""
   rand = random.uniform(-0.5, 2)
   cursor.execute("select * from songs where karma>? and time < ?\
-      ORDER BY random() LIMIT 1;",
+      AND NOT duplicate ORDER BY random() LIMIT 1;",
       (rand, int(time.time()-(60*(flood_delay-trigger*3)))))
   data = cursor.fetchall()
   if data == []:
@@ -91,11 +89,23 @@ def addsong():
         "update songs set added=?, karma=?, time=? where file=?",
         (songdata[2]+1, newkarma, int(time.time()), songdata[0],)
         )
+    cursor.execute(
+        "SELECT inode, dev FROM songs WHERE file=?;",
+        (songdata[0],)
+        )
+    one = cursor.fetchone()
+    if one and one[0]:
+      cursor.execute(
+          """UPDATE SONGS SET added=?, karma=?, time=? WHERE inode=?
+          AND dev=?""", (songdata[2]+1, newkarma, int(time.time()),
+            one[0], one[1])
+          )
     db.commit()
     try:
       client.add(songdata[0].encode(enc))
       log("D Added " + songdata[0].encode(enc))
     except mpd.CommandError:
+      log("W Couldn't add " + songdata[0].encode(enc))
       update(songdata[0])
       addsong()
 
@@ -130,9 +140,19 @@ def listened(songdata):
       "update songs set listened=?, karma=?, time=? where file=?",
       (songdata[1]+1, newkarma, int(time.time()), songdata[0])
       )
-  log("D Listened to " + songdata[0].encode(enc))
+  cursor.execute(
+      "SELECT inode, dev FROM songs WHERE file=?;",
+      (songdata[0],)
+      )
+  one = cursor.fetchone()
+  if one and one[0]:
+    cursor.execute(
+        """UPDATE SONGS SET listened=?, karma=?, time=? WHERE inode=?
+        AND dev=?""", (songdata[1]+1, newkarma, int(time.time()),
+          one[0], one[1])
+        )
   db.commit()
-## /Functions
+  log("D Listened to " + songdata[0].encode(enc))
 
 allsongs = []
 def updateone():
@@ -157,47 +177,53 @@ def update(song):
     return
 
   inode = dev = None
+  duplicate = False
+  listened, added, karma = 0, 0, 5
   if musicdir:
     # Check for duplicate in FS
     try:
       s = os.stat(musicdir + "/" + song.encode(enc))
       inode = s.st_ino
       dev = s.st_dev
-      cursor.execute("SELECT 1 FROM songs WHERE file!=? AND inode=?" +
-          "AND dev=?", (song, inode, dev))
-      if cursor.fetchone():
-        log("D " + song.encode(enc) +
-            " (Inode : " + str(inode) + ", Device : " + str(dev) +
-            ") already exists in DB")
-        cursor.execute("DELETE FROM songs WHERE file=?", (song,))
-        return
+      cursor.execute("SELECT listened, added, karma FROM songs WHERE file!=? AND inode=?" +
+          "AND dev=? AND NOT duplicate;", (song, inode, dev))
+      one = cursor.fetchone();
+      if one:
+        duplicate=True
+        listened, added, karma = one
+        cursor.execute("""UPDATE songs SET listened=?, added=?, karma=?,
+          inode=?, dev=?, duplicate=? WHERE file=?""",
+            (listened, added, karma, inode, dev, duplicate, song))
       else:
-        cursor.execute("UPDATE songs SET inode=?, dev=? WHERE file=?",
-            (inode, dev, song))
+        cursor.execute("""UPDATE songs SET inode=?, dev=?, duplicate=? WHERE file=?""",
+            (inode, dev, duplicate, song))
     except OSError:
+      log("E Couldn't stat " + musicdir + "/" + song.encode(enc))
       pass
 
   # Check if the file is in DB
-  cursor.execute("select * from songs where file=?", (song,))
+  cursor.execute("select 1 from songs where file=?", (song,))
   if cursor.fetchone() == None:
     log("N Update : Adding " + song.encode(enc))
     cursor.execute("INSERT INTO songs"+
-        "(file, listened, added, karma, time, inode, dev)"+
-        "VALUES (?, 0, 0, 5, 0, ?, ?);",
-        (song, inode, dev))
+        "(file, listened, added, karma, time, inode, dev, duplicate)"+
+        "VALUES (?, ?, ?, ?, 0, ?, ?, ?);",
+        (song, listened, added, karma, inode, dev, duplicate))
     db.commit()
-    return
-
 
 
 def getSetting(name, default=None):
   cursor.execute("""SELECT value FROM setting
       WHERE name = ?;""", (name,))
   one = cursor.fetchone()
-  if not one: return default
+  if not one and default:
+    setSetting(name, default)
+    return default
+  if not one: return None
   return one[0]
 
 def setSetting(name, val):
+  val = str(val)
   if getSetting(name) == None:
     cursor.execute("""INSERT INTO setting (name, value)
       VALUES (?, ?);""", (name, val))
@@ -212,13 +238,14 @@ def initDB():
         value text
         );""")
     cursor.execute("""CREATE TABLE IF NOT EXISTS songs(
-        file text,
-        listened int,
-        added int,
-        karma real,
-        time int,
+        file text not null,
+        listened int not null default 0,
+        added int not null default 0,
+        karma real not null default 5,
+        time int not null default 0,
         inode int,
-        dev int
+        dev int,
+        duplicate boolean not null default 0
         );""")
     db.commit()
     dbversion = getSetting("dbversion")
@@ -226,11 +253,16 @@ def initDB():
     if cursor.fetchone() and not dbversion: # old db
       setSetting("dbversion", "1")
     elif not dbversion:
-      setSetting("dbversion", "2")
-    elif int(dbversion) < 2:
-      cursor.execute("""ALTER TABLE songs ADD COLUMN inode int;""");
-      cursor.execute("""ALTER TABLE songs ADD COLUMN dev int;""");
-      setSetting("dbversion", "2")
+      setSetting("dbversion", "3")
+    else:
+      if int(dbversion) < 2:
+        cursor.execute("""ALTER TABLE songs ADD COLUMN inode int;""")
+        cursor.execute("""ALTER TABLE songs ADD COLUMN dev int;""")
+        setSetting("dbversion", "2")
+      if int(dbversion) < 3:
+        cursor.execute("""ALTER TABLE songs ADD COLUMN duplicate boolean
+            not null default 0;""")
+        setSetting("dbversion", "3")
     db.commit()
 
 def shutdown():
