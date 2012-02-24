@@ -119,7 +119,8 @@ def listened(file):
   try:
     cursor.execute("SELECT listened, added FROM songs WHERE file = ?",
         (file,))
-    songdata = cursor.fetchone();
+    songdata = cursor.fetchone()
+    log("D " + songdata.__repr__())
     newkarma = karma(songdata[0]+1, songdata[1])
     cursor.execute(
         "UPDATE songs SET listened=?, karma=?, time=? WHERE file=?",
@@ -133,7 +134,7 @@ def listened(file):
     if one and one[0]:
       cursor.execute(
           """UPDATE SONGS SET listened=?, karma=?, time=? WHERE inode=?
-          AND dev=?""", (songdata[1]+1, newkarma, int(time.time()),
+          AND dev=?""", (songdata[0]+1, newkarma, int(time.time()),
             one[0], one[1])
           )
     db.commit()
@@ -297,7 +298,7 @@ def sockAccept():
 
   try: #Socket error
     c, _ = s.accept()
-    c.settimeout(0.1)
+    c.settimeout(1)
     comm = ""
     try:
       while comm[-1:] != "\n":
@@ -480,10 +481,15 @@ def getServSock():
   try:
     s.connect(datahome + "/socket")
   except socket.error:
-    s = getServSock()
+    try:
+      s = getServSock()
+    except RuntimeError: # recursion
+      log("E Couldn't connect to socket")
+      exit(1)
   return s
 
 
+logLevel = "D"
 
 datahome = (os.getenv("XDG_DATA_HOME") or os.getenv("HOME") +
             "/.local/share") + "/autoplay"
