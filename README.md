@@ -51,7 +51,7 @@ MPD_PORT="6600"
 
 A password can be used by using the syntax `MPD_HOST="password@host"`.
 
-If the variable `MPD_DIR` is set, Autoplay will use it to flag symlinks or hardlinks as duplicates.
+If the variable `MPD_MUSIC_DIR` is set, Autoplay will use it to flag symlinks or hardlinks as duplicates.
 
 How it works
 ------------
