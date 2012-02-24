@@ -113,14 +113,13 @@ def addsong():
 def karma(listened, added):
   if listened == 0: listened = 0.1
   if added == 0: added = 0.1
-  return listened/added
+  return float(listened)/added
 
 def listened(file):
   try:
     cursor.execute("SELECT listened, added FROM songs WHERE file = ?",
         (file,))
     songdata = cursor.fetchone()
-    log("D " + songdata.__repr__())
     newkarma = karma(songdata[0]+1, songdata[1])
     cursor.execute(
         "UPDATE songs SET listened=?, karma=?, time=? WHERE file=?",
@@ -484,7 +483,7 @@ def getServSock():
     try:
       s = getServSock()
     except RuntimeError: # recursion
-      log("E Couldn't connect to socket")
+      log("E Couldn't connect to socket", True)
       exit(1)
   return s
 
