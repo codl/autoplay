@@ -76,18 +76,18 @@ def connect(i=1):
 def addsong():
   """Adds a semi-random song to the playlist"""
   rand = random.uniform(-0.5, 2)
-  cursor.execute("select * from songs where karma>? and time < ?\
-      AND NOT duplicate ORDER BY random() LIMIT 1;",
+  cursor.execute("SELECT file, listened, added FROM songs "
+      "WHERE karma>? AND time < ? "
+      "AND NOT duplicate ORDER BY random() LIMIT 1;",
       (rand, int(time.time()-(60*(flood_delay-trigger*3)))))
-  data = cursor.fetchall()
-  if data == []:
+  songdata = cursor.fetchone()
+  if not songdata:
     updateone()
     addsong()
   else:
-    songdata = data[0]
-    newkarma = karma(songdata, 2)
+    newkarma = karma(songdata[1], songdata[2]+1)
     cursor.execute(
-        "update songs set added=?, karma=?, time=? where file=?",
+        "UPDATE songs SET added=?, karma=?, time=? WHERE file=?",
         (songdata[2]+1, newkarma, int(time.time()), songdata[0],)
         )
     cursor.execute(
@@ -110,50 +110,36 @@ def addsong():
       update(songdata[0])
       addsong()
 
-def getsong(songfile):
-  """Retrieve song data from DB"""
-  cursor.execute("select * from songs where file=?", (songfile,))
-  data = cursor.fetchone()
-  if data == None:
-    update(songfile)
-    data = (songfile, 0, 0, 5, 0)
-  return data
-
-def karma(songdata, which=0):
-  """Returns karma for a song"""
-  listened = float(songdata[1])
-  added = float(songdata[2])
-
-  if which == 1:
-    listened += 1
-  elif which == 2:
-    added += 1
-
-  if listened == 0:
-    listened = 0.1
-  if added == 0:
-    added = 0.1
+def karma(listened, added):
+  if listened == 0: listened = 0.1
+  if added == 0: added = 0.1
   return listened/added
 
-def listened(songdata):
-  newkarma = karma(songdata, 1)
-  cursor.execute(
-      "update songs set listened=?, karma=?, time=? where file=?",
-      (songdata[1]+1, newkarma, int(time.time()), songdata[0])
-      )
-  cursor.execute(
-      "SELECT inode, dev FROM songs WHERE file=?;",
-      (songdata[0],)
-      )
-  one = cursor.fetchone()
-  if one and one[0]:
+def listened(file):
+  try:
+    cursor.execute("SELECT listened, added FROM songs WHERE file = ?",
+        (file,))
+    songdata = cursor.fetchone();
+    newkarma = karma(songdata[0]+1, songdata[1])
     cursor.execute(
-        """UPDATE SONGS SET listened=?, karma=?, time=? WHERE inode=?
-        AND dev=?""", (songdata[1]+1, newkarma, int(time.time()),
-          one[0], one[1])
+        "UPDATE songs SET listened=?, karma=?, time=? WHERE file=?",
+        (songdata[0]+1, newkarma, int(time.time()), file)
         )
-  db.commit()
-  log("D Listened to " + songdata[0].encode(enc))
+    cursor.execute(
+        "SELECT inode, dev FROM songs WHERE file=?;",
+        (file,)
+        )
+    one = cursor.fetchone()
+    if one and one[0]:
+      cursor.execute(
+          """UPDATE SONGS SET listened=?, karma=?, time=? WHERE inode=?
+          AND dev=?""", (songdata[1]+1, newkarma, int(time.time()),
+            one[0], one[1])
+          )
+    db.commit()
+    log("D Listened to " + file.encode(enc))
+  except KeyError: # on songdata[n]
+    pass
 
 allsongs = []
 def updateone():
@@ -161,7 +147,7 @@ def updateone():
     cursor.execute("VACUUM;")
     for song in client.list("file"):
       allsongs.append(unicode(song, enc))
-    for song in cursor.execute("select file from songs;"):
+    for song in cursor.execute("SELECT file FROM songs;"):
       allsongs.append(song[0])
     random.shuffle(allsongs)
 
@@ -203,7 +189,7 @@ def update(song):
       pass
 
   # Check if the file is in DB
-  cursor.execute("select 1 from songs where file=?", (song,))
+  cursor.execute("SELECT 1 FROM songs WHERE file=?", (song,))
   if cursor.fetchone() == None:
     log("N Update : Adding " + song.encode(enc))
     cursor.execute("INSERT INTO songs"+
@@ -451,7 +437,7 @@ def serve():
               armed = True
             elif armed and (end > mintime) and (pos > playtime*end/100):
               armed = False # Disarm until the next song
-              listened(getsong(unicode(currentsong["file"], enc)))
+              listened(unicode(currentsong["file"], enc))
               songid = (currentsong["id"])
 
       except KeyError:
