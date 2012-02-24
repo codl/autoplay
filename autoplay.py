@@ -297,13 +297,15 @@ def sockAccept():
 
   try: #Socket error
     c, _ = s.accept()
-    c.settimeout(0.2)
+    c.settimeout(0.1)
     comm = ""
     try:
-      while True: comm += c.recv(1024)
+      while comm[-1:] != "\n":
+        comm += c.recv(1024)
     except socket.error:
-      pass
-    c.setblocking(1)
+      comm=""
+    c.settimeout(0)
+    comm = comm[:-1]
     if len(comm) != 0:
       if comm == "kill":
         c.send("Shutting down server...\n")
@@ -370,8 +372,9 @@ def sockAccept():
       if radioMode: c.send(triggerStatus())
     c.shutdown(socket.SHUT_RD)
     c.close()
+    return True;
   except socket.error:
-    pass
+    return False;
 
 def serve():
   global client, db, cursor, s
@@ -380,8 +383,8 @@ def serve():
 
   s = socket.socket(socket.AF_UNIX)
   s.bind(datahome + "/socket")
+  s.settimeout(.3)
   s.listen(2)
-  s.setblocking(0)
 
   db = sqlite3.connect((datahome+"/db.sqlite").encode(enc))
   cursor = db.cursor()
@@ -407,14 +410,16 @@ def serve():
   while True:
 
     try: #KeyboardInterrupt
-      sockAccept()
+      if sockAccept():
+        lastUpdate = lastMpd = time.time()
+        next
 
       try: #MPD or socket error
         clock = time.time()
         if clock - lastUpdate >= 20:
           lastUpdate = clock
           updateone()
-        if clock - lastMpd >= .5:
+        if clock - lastMpd >= .6:
           lastMpd = clock
           if radioMode:
             if client.status()["consume"] == "0":
@@ -447,8 +452,6 @@ def serve():
         log("W Connection to MPD lost")
         client.disconnect()
         connect()
-
-      time.sleep(0.2)
 
     except KeyboardInterrupt:
       s.shutdown(socket.SHUT_RDWR)
@@ -506,25 +509,27 @@ musicdir = os.getenv("MPD_MUSIC_DIR") or os.getenv("mpd_music_dir")
 logio = io.open(datahome + "/log", "at", buffering=1, encoding=enc)
 
 
-
-silent = False
-s = getServSock()
-if len(sys.argv) > 1:
-  if sys.argv[1] == "start":
-    if os.fork() == 0:
-      silent = True
+if __name__ == "__main__":
+  silent = False
+  s = getServSock()
+  if len(sys.argv) > 1:
+    if sys.argv[1] == "start":
+      if os.fork() == 0:
+        silent = True
+      else:
+        exit(0)
     else:
-      exit(0)
+      s.send(" ".join(sys.argv[1:]) + "\n")
   else:
-    s.send(" ".join(sys.argv[1:]))
+    s.send("\n")
 
-data = s.recv(1024)
-while data != "":
-  if not silent:
-    print data,
   data = s.recv(1024)
+  while data != "":
+    if not silent:
+      print data,
+    data = s.recv(1024)
 
 
-s.shutdown(socket.SHUT_RDWR)
+  s.shutdown(socket.SHUT_RDWR)
 
 # vim: tw=70 ts=2 sw=2
