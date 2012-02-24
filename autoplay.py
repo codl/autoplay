@@ -370,7 +370,7 @@ def sockAccept():
     else:
       c.send(radioStatus())
       if radioMode: c.send(triggerStatus())
-    c.shutdown(socket.SHUT_RD)
+    c.shutdown(socket.SHUT_RDWR)
     c.close()
     return True;
   except socket.error:
@@ -517,24 +517,19 @@ logio = io.open(datahome + "/log", "at", buffering=1, encoding=enc)
 if __name__ == "__main__":
   silent = False
   s = getServSock()
-  if len(sys.argv) > 1:
-    if sys.argv[1] == "start":
-      if os.fork() == 0:
-        silent = True
-      else:
-        exit(0)
-    else:
-      s.send(" ".join(sys.argv[1:]) + "\n")
-  else:
-    s.send("\n")
+  try:
+    if len(sys.argv) <= 1 or sys.argv[1] != "start":
+      s.sendall(" ".join(sys.argv[1:]) + "\n")
 
-  data = s.recv(1024)
-  while data != "":
-    if not silent:
-      print data,
-    data = s.recv(1024)
+      data = s.recv(1024)
+      while data != "":
+        print data,
+        data = s.recv(1024)
 
+  except KeyboardInterrupt:
+    pass
 
   s.shutdown(socket.SHUT_RDWR)
+  s.close()
 
 # vim: tw=70 ts=2 sw=2
