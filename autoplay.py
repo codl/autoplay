@@ -116,6 +116,7 @@ def karma(listened, added):
   return float(listened)/added
 
 def listened(file):
+  update(file);
   try:
     cursor.execute("SELECT listened, added FROM songs WHERE file = ?",
         (file,))
@@ -138,7 +139,7 @@ def listened(file):
           )
     db.commit()
     log("D Listened to " + file.encode(enc))
-  except KeyError: # on songdata[n]
+  except TypeError: # on songdata[n]
     pass
 
 allsongs = []
@@ -282,7 +283,7 @@ def pprintSong(file=None):
     try:
       prettysong = song['title']
       prettysong = song['artist'] + " - " + prettysong
-    except KeyError: pass
+    except TypeError: pass
     return prettysong + """
 Listened : """ + str(one[0]) + """
 Added    : """ + str(one[1]) + """
@@ -445,7 +446,7 @@ def serve():
               listened(unicode(currentsong["file"], enc))
               songid = (currentsong["id"])
 
-      except KeyError:
+      except TypeError:
         pass
 
       except (socket.error, mpd.ConnectionError):
