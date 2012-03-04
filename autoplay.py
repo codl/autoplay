@@ -139,7 +139,7 @@ def listened(file):
           )
     db.commit()
     log("D Listened to " + file.encode(enc))
-  except TypeError: # on songdata[n]
+  except (KeyError, TypeError): # on songdata[n]
     pass
 
 allsongs = []
@@ -283,7 +283,7 @@ def pprintSong(file=None):
     try:
       prettysong = song['title']
       prettysong = song['artist'] + " - " + prettysong
-    except TypeError: pass
+    except (KeyError, TypeError): pass
     return prettysong + """
 Listened : """ + str(one[0]) + """
 Added    : """ + str(one[1]) + """
@@ -446,7 +446,7 @@ def serve():
               listened(unicode(currentsong["file"], enc))
               songid = (currentsong["id"])
 
-      except TypeError:
+      except (KeyError, TypeError):
         pass
 
       except (socket.error, mpd.ConnectionError):
