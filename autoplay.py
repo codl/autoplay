@@ -275,7 +275,7 @@ def pprintSong(file=None):
     else:
       song = client.find("file", file.encode(enc))[0]
     cursor.execute("""SELECT listened, added, karma FROM songs
-      WHERE file = ?""", (song['file'],))
+      WHERE file = ?""", (unicode(song['file'], enc),))
     one = cursor.fetchone()
     if not one:
       return "\n"
