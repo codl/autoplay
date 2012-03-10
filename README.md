@@ -26,7 +26,7 @@ command can be one of :
 
   start
   kill
-  loglevel [debug|notice|warning|error]
+  loglevel [debug|info|notice|warning|error]
   help
   version
 ```

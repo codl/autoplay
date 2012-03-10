@@ -44,7 +44,7 @@ enc = sys.getfilesystemencoding()
 
 def log(msg, stdout=False):
   """Logs to file, and optionally to stdout. Obvious enough"""
-  alllevels = "DNWE" # Debug, Notice, Warning, Error
+  alllevels = "DINWE" # Debug, Info, Notice, Warning, Error
   loglevels = alllevels[alllevels.find(logLevel):]
   if stdout:
     print msg[2:]
@@ -104,7 +104,9 @@ def addsong():
     db.commit()
     try:
       client.add(songdata[0].encode(enc))
-      log("D Added " + songdata[0].encode(enc))
+      log("I Added " + songdata[0].encode(enc))
+      log("D A:" + str(songdata[2]+1) + ", K:" +
+          str(newkarma))
     except mpd.CommandError:
       log("W Couldn't add " + songdata[0].encode(enc))
       update(songdata[0])
@@ -138,7 +140,8 @@ def listened(file):
             one[0], one[1])
           )
     db.commit()
-    log("D Listened to " + file.encode(enc))
+    log("I Listened to " + file.encode(enc))
+    log("D L:" + str(songdata[0]+1) + ", K:" +str(newkarma))
   except (KeyError, TypeError): # on songdata[n]
     pass
 
