@@ -291,7 +291,7 @@ def pprintSong(file=None):
 Listened : """ + str(one[0]) + """
 Added    : """ + str(one[1]) + """
 Karma    : """ + str(one[2]) + "\n"
-  except (IndexError, mpd.ConnectionError):
+  except (IndexError, KeyError, mpd.ConnectionError):
     return "\n";
 
 def sockAccept():
