@@ -420,7 +420,7 @@ def serve():
 
       try: #MPD or socket error
         clock = time.time()
-        if clock - lastUpdate >= 20:
+        if clock - lastUpdate >= 5:
           lastUpdate = clock
           updateone()
         if clock - lastMpd >= .6:
