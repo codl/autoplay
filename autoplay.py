@@ -338,7 +338,6 @@ def sockAccept():
         elif comm[9:].lower() in ("n", "notice"): logLevel = "N"
         elif comm[9:].lower() in ("w", "warning"): logLevel = "W"
         elif comm[9:].lower() in ("e", "error"): logLevel = "E"
-        elif comm[9:].lower() in ("on", "yes", "start"): radioMode = True
         elif comm[8:9] == " ":
           c.send("Syntax: autoplay loglevel [debug|notice|warning|error]\n")
         c.send("Log level : " + logLevel + "\n")
