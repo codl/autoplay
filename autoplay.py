@@ -311,7 +311,7 @@ def sockAccept():
     c.settimeout(0)
     comm = comm[:-1]
     if len(comm) != 0:
-      if comm == "kill" || comm == "stop":
+      if comm == "kill" or comm == "stop":
         c.send("Shutting down server...\n")
         c.shutdown(socket.SHUT_RD)
         c.close()
