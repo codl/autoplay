@@ -25,7 +25,7 @@ command can be one of :
   info [filename]           : gives some info on the specified track, or the currently playing track
 
   start
-  kill
+  stop (synonym: kill)
   loglevel [debug|info|notice|warning|error]
   help
   version

@@ -34,7 +34,7 @@ command can be one of :
   info [path]
 
   start
-  kill
+  stop (synonym: kill)
   loglevel [debug|notice|warning|error]
   help
   version"""
@@ -311,7 +311,7 @@ def sockAccept():
     c.settimeout(0)
     comm = comm[:-1]
     if len(comm) != 0:
-      if comm == "kill":
+      if comm == "kill" || comm == "stop":
         c.send("Shutting down server...\n")
         c.shutdown(socket.SHUT_RD)
         c.close()
