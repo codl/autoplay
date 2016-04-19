@@ -5,14 +5,13 @@ a daemon that keeps your [MPD][] playlist filled with the music you actually lis
 
 [MPD]: http://mpd.wikia.com (Music Player Daemon)
 
-Dependencies
+Requirements
 ------------
 
-* [python 2.x][python]
-* [python-mpd][pympd]
+* python 3.x
+* python-mpd2
 
-[python]: http://python.org/
-[pympd]: http://jatreuman.indefero.net/p/python-mpd/
+If you have pip installed, a simple `pip install -r requirements.txt` should do the job.
 
 Usage
 -----
@@ -61,8 +60,3 @@ Autoplay gives each song a *karma* rating based on how often it adds that song, 
 Usually, bad songs have karma under 0.25, *meh* songs have karma between 0.25 and 0.60, and good songs are over 0.60. A song that is often added by the user to the playlist will have a karma over 1.
 
 When a song is played, there is a *cooldown time* (default 12h) during which autoplay cannot add it. This way, the same songs cannot be spammed over and over.
-
-Notice for v1.X users
----------------------
-
-The database has moved. It was `your/music/dir/.autodb`, it is now `$XDG_DATA_HOME/autoplay/db.sqlite` (usually `~/.local/share/autoplay/db.sqlite`). Move your database to the new location if you want to keep your stats.
