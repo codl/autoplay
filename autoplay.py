@@ -1,10 +1,9 @@
-#!/usr/bin/env python2
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
 
 '''
 Keeps your MPD playlist filled with music you like
 
-Dependencies : python-mpd
+Dependencies : python-mpd2
 '''
 
 import os
@@ -38,17 +37,14 @@ command can be one of :
   help
   version"""
 
-enc = sys.getfilesystemencoding()
-#enc = "UTF-8"
-
 def log(msg, stdout=False):
   """Logs to file, and optionally to stdout. Obvious enough"""
   alllevels = "DINWE" # Debug, Info, Notice, Warning, Error
   loglevels = alllevels[alllevels.find(logLevel):]
   if stdout:
-    print msg[2:]
+    print(msg[2:])
   if msg[0] in loglevels:
-    logio.write(unicode(msg, enc)+"\n")
+    logio.write(msg+"\n")
 
 def connect(i=1):
   log("N Connecting...")
@@ -102,12 +98,12 @@ def addsong():
           )
     db.commit()
     try:
-      client.add(songdata[0].encode(enc))
-      log("I Added " + songdata[0].encode(enc))
+      client.add(songdata[0])
+      log("I Added " + songdata[0])
       log("D A:" + str(songdata[2]+1) + ", K:" +
           str(newkarma))
     except mpd.CommandError:
-      log("W Couldn't add " + songdata[0].encode(enc))
+      log("W Couldn't add " + songdata[0])
       update(songdata[0])
       addsong()
 
@@ -139,7 +135,7 @@ def listened(file):
             one[0], one[1])
           )
     db.commit()
-    log("I Listened to " + file.encode(enc))
+    log("I Listened to " + file)
     log("D L:" + str(songdata[0]+1) + ", K:" +str(newkarma))
   except (KeyError, TypeError): # on songdata[n]
     pass
@@ -149,7 +145,7 @@ def updateone():
   if allsongs == []:
     cursor.execute("VACUUM;")
     for song in client.list("file"):
-      allsongs.append(unicode(song, enc))
+      allsongs.append(song)
     for song in cursor.execute("SELECT file FROM songs;"):
       allsongs.append(song[0])
     random.shuffle(allsongs)
@@ -159,9 +155,9 @@ def updateone():
 
 def update(song):
   # Check if the file is in mpd
-  records = client.search("filename", song.encode(enc))
-  if not any(unicode(r['file'], enc) == song for r in records):
-    log("N Update : Removing " + song.encode(enc))
+  records = client.search("filename", song)
+  if not any(r['file'] == song for r in records):
+    log("N Update : Removing " + song)
     cursor.execute("delete from songs where file=?", (song,))
     db.commit()
     return
@@ -172,7 +168,7 @@ def update(song):
   if musicdir:
     # Check for duplicate in FS
     try:
-      s = os.stat(musicdir + "/" + song.encode(enc))
+      s = os.stat(musicdir + "/" + song)
       inode = s.st_ino
       dev = s.st_dev
       cursor.execute("SELECT listened, added, karma FROM songs WHERE file!=? AND inode=?" +
@@ -188,13 +184,13 @@ def update(song):
         cursor.execute("""UPDATE songs SET inode=?, dev=?, duplicate=? WHERE file=?""",
             (inode, dev, duplicate, song))
     except OSError:
-      log("E Couldn't stat " + musicdir + "/" + song.encode(enc))
+      log("E Couldn't stat " + musicdir + "/" + song)
       pass
 
   # Check if the file is in DB
   cursor.execute("SELECT 1 FROM songs WHERE file=?", (song,))
   if cursor.fetchone() == None:
-    log("N Update : Adding " + song.encode(enc))
+    log("N Update : Adding " + song)
     cursor.execute("INSERT INTO songs"+
         "(file, listened, added, karma, time, inode, dev, duplicate)"+
         "VALUES (?, ?, ?, ?, 0, ?, ?, ?);",
@@ -275,9 +271,9 @@ def pprintSong(file=None):
     if not file:
       song = client.currentsong()
     else:
-      song = client.find("file", file.encode(enc))[0]
+      song = client.find("file", file)[0]
     cursor.execute("""SELECT listened, added, karma FROM songs
-      WHERE file = ?""", (unicode(song['file'], enc),))
+      WHERE file = ?""", (song['file'],))
     one = cursor.fetchone()
     if not one:
       return "\n"
@@ -301,77 +297,79 @@ def sockAccept():
   try: #Socket error
     c, _ = s.accept()
     c.settimeout(1)
-    comm = ""
+    comm = b""
     try:
-      while comm[-1:] != "\n":
+      while comm[-1:] != b"\n":
         comm += c.recv(1024)
     except socket.error:
-      comm=""
+      comm=b""
     c.settimeout(0)
     comm = comm[:-1]
     if len(comm) != 0:
-      if comm == "kill" or comm == "stop":
-        c.send("Shutting down server...\n")
+      if comm == b"kill" or comm == b"stop":
+        c.send(b"Shutting down server...\n")
         c.shutdown(socket.SHUT_RD)
         c.close()
         shutdown()
         exit(0)
-      elif comm[:5] == "radio":
-        if comm[6:] in ("off", "no", "stop"): radioMode = False
-        elif comm[6:] in ("on", "yes", "start"): radioMode = True
-        elif comm[6:] == "toggle": radioMode = not radioMode
-        elif comm[5:6] == " ": c.send("Syntax: autoplay radio [on|off|toggle]\n")
-        c.send(radioStatus())
+      elif comm[:5] == b"radio":
+        if comm[6:] in (b"off", b"no", b"stop"): radioMode = False
+        elif comm[6:] in (b"on", b"yes", b"start"): radioMode = True
+        elif comm[6:] == b"toggle": radioMode = not radioMode
+        elif comm[5:6] == b" ": c.send(b"Syntax: autoplay radio [on|off|toggle]\n")
+        c.send(radioStatus().encode())
         setSetting("radioMode", str(radioMode))
-      elif comm[:7] == "trigger":
+      elif comm[:7] == b"trigger":
         try:
           trigger = int(comm[8:])
           setSetting("trigger", str(trigger))
         except ValueError:
-          if comm[7:8] == " ":
-            c.send("\"" + comm[8:] + "\" is not a valid number")
-        c.send(triggerStatus())
+          if comm[7:8] == b" ":
+            c.send(b"\"" + comm[8:] + b"\" is not a valid number\n")
+        c.send(triggerStatus().encode())
 
-      elif comm[:8] == "loglevel":
-        if comm[9:].lower() in ("d", "debug"): logLevel = "D"
-        elif comm[9:].lower() in ("n", "notice"): logLevel = "N"
-        elif comm[9:].lower() in ("w", "warning"): logLevel = "W"
-        elif comm[9:].lower() in ("e", "error"): logLevel = "E"
-        elif comm[8:9] == " ":
-          c.send("Syntax: autoplay loglevel [debug|notice|warning|error]\n")
-        c.send("Log level : " + logLevel + "\n")
+      elif comm[:8] == b"loglevel":
+        if comm[9:].lower() in (b"d", b"debug"): logLevel = "D"
+        elif comm[9:].lower() in (b"n", b"notice"): logLevel = "N"
+        elif comm[9:].lower() in (b"w", b"warning"): logLevel = "W"
+        elif comm[9:].lower() in (b"e", b"error"): logLevel = "E"
+        elif comm[8:9] == b" ":
+          c.send(b"Syntax: autoplay loglevel [debug|notice|warning|error]\n")
+        c.send(b"Log level : " + logLevel.encode() + b"\n")
         setSetting("logLevel", logLevel)
 
-      elif comm[:4] == "info":
-        if comm[4:] != "": c.send(pprintSong(comm[5:]))
-        else: c.send(pprintSong())
+      elif comm[:4] == b"info":
+        if comm[4:] != b"": c.send(pprintSong(comm[5:].decode()).encode())
+        else: c.send(pprintSong().encode())
 
-      elif comm[:6] == "update":
-        if comm[7:] == "all":
-          c.send("This may be *very* long, depending on the size of your"
-              + " library.\n")
+      elif comm[:6] == b"update":
+        if comm[7:] == b"all":
+          c.send(b"This may be *very* long, depending on the size of your"
+              + b" library.\n")
           allsongs = []
           updateone()
-          c.send(str(len(allsongs) + 1) + " songs to update\n\n" )
+          c.send(("%s songs to update\n\n" % (len(allsongs) + 1,))
+            .encode())
           while allsongs != []:
             if len(allsongs) % 200 == 0:
-              c.send(str(len(allsongs)) + " remaining...\n")
+              c.send(("%s remaining...\n" % (len(allsongs),))
+                .encode())
             updateone()
-          c.send("Done")
+          c.send(b"Done")
         else:
-          update(unicode(comm[7:],enc))
+          update(comm[7:].decode())
 
-      elif comm in ("help","-h","--help"):
-        c.send(helpstring + "\n\n")
-      elif comm in ("version", "-V"):
-        c.send("Autoplay v" + version + "\n")
+      elif comm in (b"help",b"-h",b"--help"):
+        c.send(helpstring.encode() + b"\n\n")
+      elif comm in (b"version", b"-V"):
+        c.send(b"Autoplay v" + version.encode() + b"\n")
       else:
-        log("W Unknown command : " + comm)
-        c.send("Unknown command : " + comm + "\n")
-        c.send(helpstring + "\n")
+        log("W Unknown command : " + comm.decode())
+        c.send(b"Unknown command : " + comm + b"\n")
+        c.send(helpstring.encode() + b"\n")
     else:
-      c.send(radioStatus())
-      if radioMode: c.send(triggerStatus())
+      c.send(radioStatus().encode())
+      if radioMode: c.send(triggerStatus().encode())
     c.shutdown(socket.SHUT_RDWR)
     c.close()
     return True;
@@ -388,7 +386,7 @@ def serve():
   s.settimeout(.3)
   s.listen(2)
 
-  db = sqlite3.connect((datahome+"/db.sqlite").encode(enc))
+  db = sqlite3.connect(datahome+"/db.sqlite")
   cursor = db.cursor()
   initDB()
 
@@ -444,7 +442,7 @@ def serve():
               armed = True
             elif armed and (end > mintime) and (pos > playtime*end/100):
               armed = False # Disarm until the next song
-              listened(unicode(currentsong["file"], enc))
+              listened(currentsong["file"])
               songid = (currentsong["id"])
 
       except (KeyError, TypeError):
@@ -513,7 +511,7 @@ port = os.getenv("MPD_PORT", "6600")
 musicdir = os.getenv("MPD_MUSIC_DIR") or os.getenv("mpd_music_dir")
 
 
-logio = io.open(datahome + "/log", "at", buffering=1, encoding=enc)
+logio = io.open(datahome + "/log", "at", buffering=1)
 
 
 if __name__ == "__main__":
@@ -521,11 +519,11 @@ if __name__ == "__main__":
   s = getServSock()
   try:
     if len(sys.argv) <= 1 or sys.argv[1] != "start":
-      s.sendall(" ".join(sys.argv[1:]) + "\n")
+      s.sendall(b" ".join(map(lambda s: s.encode(), sys.argv[1:])) + b"\n")
 
       data = s.recv(1024)
-      while data != "":
-        print data,
+      while data != b"":
+        print(data.decode(), end="")
         data = s.recv(1024)
 
   except KeyboardInterrupt:

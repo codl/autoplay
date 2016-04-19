@@ -1,1 +1,1 @@
-python-mpd==0.3.0
+python-mpd2==0.5.5
