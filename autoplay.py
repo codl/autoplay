@@ -5,7 +5,6 @@
 Keeps your MPD playlist filled with music you like
 
 Dependencies : python-mpd
-               pysqlite
 '''
 
 import os
