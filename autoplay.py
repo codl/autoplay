@@ -359,7 +359,7 @@ def command(command):
       ret = pprintSong()
 
   elif args[0] in ("version", "-V"):
-    ret = "Autoplay v%s\n" % (verson,)
+    ret = "Autoplay v%s\n" % (version,)
 
   else:
     if command == '':
