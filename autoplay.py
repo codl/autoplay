@@ -305,76 +305,72 @@ def sockAccept():
       comm=b""
     c.settimeout(0)
     comm = comm[:-1]
-    if len(comm) != 0:
-      if comm == b"kill" or comm == b"stop":
-        c.send(b"Shutting down server...\n")
-        c.shutdown(socket.SHUT_RD)
-        c.close()
-        shutdown()
-        exit(0)
-      elif comm[:5] == b"radio":
-        if comm[6:] in (b"off", b"no", b"stop"): radioMode = False
-        elif comm[6:] in (b"on", b"yes", b"start"): radioMode = True
-        elif comm[6:] == b"toggle": radioMode = not radioMode
-        elif comm[5:6] == b" ": c.send(b"Syntax: autoplay radio [on|off|toggle]\n")
-        c.send(radioStatus().encode())
-        setSetting("radioMode", str(radioMode))
-      elif comm[:7] == b"trigger":
-        try:
-          trigger = int(comm[8:])
-          setSetting("trigger", str(trigger))
-        except ValueError:
-          if comm[7:8] == b" ":
-            c.send(b"\"" + comm[8:] + b"\" is not a valid number\n")
-        c.send(triggerStatus().encode())
-
-      elif comm[:8] == b"loglevel":
-        if comm[9:].lower() in (b"d", b"debug"): logLevel = "D"
-        elif comm[9:].lower() in (b"n", b"notice"): logLevel = "N"
-        elif comm[9:].lower() in (b"w", b"warning"): logLevel = "W"
-        elif comm[9:].lower() in (b"e", b"error"): logLevel = "E"
-        elif comm[8:9] == b" ":
-          c.send(b"Syntax: autoplay loglevel [debug|notice|warning|error]\n")
-        c.send(b"Log level : " + logLevel.encode() + b"\n")
-        setSetting("logLevel", logLevel)
-
-      elif comm[:4] == b"info":
-        if comm[4:] != b"": c.send(pprintSong(comm[5:].decode()).encode())
-        else: c.send(pprintSong().encode())
-
-      elif comm[:6] == b"update":
-        if comm[7:] == b"all":
-          c.send(b"This may be *very* long, depending on the size of your"
-              + b" library.\n")
-          allsongs = []
-          updateone()
-          c.send(("%s songs to update\n\n" % (len(allsongs) + 1,))
-            .encode())
-          while allsongs != []:
-            if len(allsongs) % 200 == 0:
-              c.send(("%s remaining...\n" % (len(allsongs),))
-                .encode())
-            updateone()
-          c.send(b"Done")
-        else:
-          update(comm[7:].decode())
-
-      elif comm in (b"help",b"-h",b"--help"):
-        c.send(helpstring.encode() + b"\n\n")
-      elif comm in (b"version", b"-V"):
-        c.send(b"Autoplay v" + version.encode() + b"\n")
-      else:
-        log("W Unknown command : " + comm.decode())
-        c.send(b"Unknown command : " + comm + b"\n")
-        c.send(helpstring.encode() + b"\n")
-    else:
-      c.send(radioStatus().encode())
-      if radioMode: c.send(triggerStatus().encode())
+    resp, will_shutdown = command(comm);
+    c.send(resp)
     c.shutdown(socket.SHUT_RDWR)
     c.close()
+    if(will_shutdown):
+      shutdown()
+      exit(0)
     return True;
   except socket.error:
     return False;
+
+def command(command):
+  global client, db, cursor, s
+  global trigger, radioMode, logLevel
+  global allsongs
+
+  ret = ""
+  will_shutdown = False
+  command = command.decode()
+  args = command.split('\0')
+
+  if args[0] in ("kill", "stop"):
+    ret = "Shutting down server...\n"
+    will_shutdown = True
+
+  elif args[0] == "radio":
+    if len(args) > 1:
+      if args[1] in ("off", "no", "stop"):
+        radioMode = False
+      elif args[1] in ("on", "yes", "start"):
+        radioMode = True
+      elif args[1] == "toggle":
+        radioMode = not radioMode
+      else:
+        ret = "Syntax: autoplay radio [on|off|toggle]\n"
+      setSetting("radioMode", str(radioMode))
+    ret += radioStatus()
+
+  elif args[0] == "trigger":
+    if len(args) > 1:
+      try:
+        trigger = int(args[1])
+        setSetting("trigger", str(trigger))
+      except ValueError:
+        ret = '"' + args[1] + '" is not a valid number \n'
+    ret += triggerStatus()
+
+  elif args[0] == "info":
+    if len(args) > 1:
+      ret = pprintSong(args[1])
+    else:
+      ret = pprintSong()
+
+  elif args[0] in ("version", "-V"):
+    ret = "Autoplay v%s\n" % (verson,)
+
+  else:
+    if command == '':
+      ret = radioStatus()
+    else:
+      if command not in ("help", "--help", "-h"):
+        log("W Unknown command: " + command)
+        ret = "Unknown command: " + command + "\n"
+      ret += helpstring + "\n"
+
+  return (ret.encode(), will_shutdown)
 
 def serve():
   global client, db, cursor, s
@@ -519,7 +515,7 @@ if __name__ == "__main__":
   s = getServSock()
   try:
     if len(sys.argv) <= 1 or sys.argv[1] != "start":
-      s.sendall(b" ".join(map(lambda s: s.encode(), sys.argv[1:])) + b"\n")
+      s.sendall(b"\0".join(map(lambda s: s.encode(), sys.argv[1:])) + b"\n")
 
       data = s.recv(1024)
       while data != b"":
