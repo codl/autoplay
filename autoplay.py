@@ -22,7 +22,7 @@ flood_delay = 12*60 # Minutes to wait before adding the same song again
 tries = 10 # Retry connecting this many times
 ## /Config
 
-version = "3.0.0"
+version = "3.1.0"
 helpstring = """Syntax : """ + sys.argv[0] + """ [command]
 command can be one of :
   radio [on|off|toggle]
