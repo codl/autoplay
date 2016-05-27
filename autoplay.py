@@ -68,75 +68,101 @@ def connect(i=1):
   log("N Connected")
 
 
-def addsong():
+def addsong(playlist):
   """Adds a semi-random song to the playlist"""
-  rand = random.uniform(-0.5, 2)
-  cursor.execute("SELECT file, listened, added FROM songs "
-      "WHERE karma>? AND time < ? "
-      "AND NOT duplicate ORDER BY random() LIMIT 1;",
-      (rand, int(time.time()-(60*(flood_delay-trigger*3)))))
+  prevsong = None;
+  if(len(playlist)>0):
+    prevsong = playlist[-1]["file"]
+  cursor.execute("""
+    WITH joined AS (
+      SELECT *, coalesce(karma + chainkarma, karma) as totalkarma
+        FROM songs LEFT JOIN
+        (
+          SELECT nextsong, karma AS chainkarma
+            FROM chain
+            WHERE prevsong = ?
+        )
+    	WHERE NOT duplicate AND time < ?
+    ),
+    maxkarma AS (
+      SELECT max(totalkarma) AS maxkarma FROM joined
+    )
+    SELECT file, karma, added, chainkarma FROM joined, maxkarma
+      WHERE totalkarma >= maxkarma - 1
+      ORDER BY random() LIMIT 1;
+  """, (prevsong, int(time.time()-(60*(flood_delay-trigger*3)))))
   songdata = cursor.fetchone()
   if not songdata:
     updateone()
-    addsong()
+    addsong(playlist)
   else:
-    newkarma = karma(songdata[1], songdata[2]+1)
+    cursor.execute("UPDATE chain SET karma=karma/2 WHERE nextsong=? AND prevsong=?",
+        (songdata[0], prevsong))
     cursor.execute(
-        "UPDATE songs SET added=?, karma=?, time=? WHERE file=?",
-        (songdata[2]+1, newkarma, int(time.time()), songdata[0],)
+        "UPDATE songs SET added=?, karma=karma/2, time=? WHERE file=?",
+        (songdata[2]+1, int(time.time()), songdata[0])
         )
     cursor.execute(
-        "SELECT inode, dev FROM songs WHERE file=?;",
+        "SELECT inode, dev, karma, added FROM songs WHERE file=?;",
         (songdata[0],)
         )
-    one = cursor.fetchone()
-    if one and one[0]:
+    row = cursor.fetchone()
+    if row and row[0]:
       cursor.execute(
-          """UPDATE SONGS SET added=?, karma=?, time=? WHERE inode=?
-          AND dev=?""", (songdata[2]+1, newkarma, int(time.time()),
-            one[0], one[1])
+          """UPDATE songs SET karma=?, added=?, time=? WHERE inode=?
+          AND dev=?""", (row[2], row[3], int(time.time()),
+            row[0], row[1])
           )
     db.commit()
     try:
       client.add(songdata[0])
       log("I Added " + songdata[0])
-      log("D A:" + str(songdata[2]+1) + ", K:" +
-          str(newkarma))
+      log("D A: %s, K: %s -> %s, C: %s" %
+        (songdata[2]+1, songdata[1], songdata[1]/2, songdata[3]))
     except mpd.CommandError:
       log("W Couldn't add " + songdata[0])
       update(songdata[0])
-      addsong()
+      addsong(playlist)
 
-def karma(listened, added):
-  if listened == 0: listened = 0.1
-  if added == 0: added = 0.1
-  return float(listened)/added
-
-def listened(file):
+def listened(song, prevsong):
+  file = song["file"]
   update(file);
   try:
-    cursor.execute("SELECT listened, added FROM songs WHERE file = ?",
+    cursor.execute("SELECT listened, added, karma FROM songs WHERE file = ?",
         (file,))
     songdata = cursor.fetchone()
-    newkarma = karma(songdata[0]+1, songdata[1])
     cursor.execute(
-        "UPDATE songs SET listened=?, karma=?, time=? WHERE file=?",
-        (songdata[0]+1, newkarma, int(time.time()), file)
+        "UPDATE songs SET listened=?, karma=karma+1, time=? WHERE file=?",
+        (songdata[0]+1, int(time.time()), file)
         )
     cursor.execute(
-        "SELECT inode, dev FROM songs WHERE file=?;",
+        "SELECT inode, dev, listened, karma FROM songs WHERE file=?;",
         (file,)
         )
-    one = cursor.fetchone()
-    if one and one[0]:
+    row = cursor.fetchone()
+    if row and row[0]:
       cursor.execute(
           """UPDATE SONGS SET listened=?, karma=?, time=? WHERE inode=?
-          AND dev=?""", (songdata[0]+1, newkarma, int(time.time()),
-            one[0], one[1])
+          AND dev=?""", (row[2], row[3], int(time.time()),
+            row[0], row[1])
           )
-    db.commit()
     log("I Listened to " + file)
-    log("D L:" + str(songdata[0]+1) + ", K:" +str(newkarma))
+    log("D L: %s, K: %s -> %s"
+        % (songdata[0]+1, songdata[2], songdata[2]+1))
+
+    if prevsong:
+      cursor.execute("SELECT 1 FROM chain WHERE prevsong = ? AND nextsong = ?;",
+          (prevsong['file'], song['file']))
+      if cursor.fetchone():
+        cursor.execute("UPDATE chain SET karma = karma+1 WHERE prevsong = ? AND nextsong = ?;",
+          (prevsong['file'], song['file']))
+        log("D updated chain")
+      else:
+        cursor.execute("INSERT INTO chain (prevsong, nextsong) VALUES (?, ?);",
+          (prevsong['file'], song['file']))
+        log("D created chain")
+
+    db.commit()
   except (KeyError, TypeError): # on songdata[n]
     pass
 
@@ -219,6 +245,7 @@ def setSetting(name, val):
   db.commit()
 
 def initDB():
+    cursor.execute("""PRAGMA foreign_keys = ON;""");
     cursor.execute("""CREATE TABLE IF NOT EXISTS setting(
         name text not null,
         value text
@@ -233,13 +260,24 @@ def initDB():
         dev int,
         duplicate boolean not null default 0
         );""")
+    cursor.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS unique_songs ON songs(file);
+        """)
+    cursor.execute("""CREATE TABLE IF NOT EXISTS chain(
+        prevsong TEXT NOT NULL,
+        nextsong TEXT NOT NULL,
+        karma REAL NOT NULL DEFAULT 1.5,
+        FOREIGN KEY (prevsong) REFERENCES songs(file) ON DELETE CASCADE ON UPDATE CASCADE,
+        FOREIGN KEY (nextsong) REFERENCES songs(file) ON DELETE CASCADE ON UPDATE CASCADE,
+        UNIQUE (prevsong, nextsong)
+        );""")
     db.commit()
     dbversion = getSetting("dbversion")
     cursor.execute("""SELECT 1 FROM songs LIMIT 1;""")
     if cursor.fetchone() and not dbversion: # old db
       setSetting("dbversion", "1")
     elif not dbversion:
-      setSetting("dbversion", "3")
+      setSetting("dbversion", "4")
     else:
       if int(dbversion) < 2:
         cursor.execute("""ALTER TABLE songs ADD COLUMN inode int;""")
@@ -249,6 +287,9 @@ def initDB():
         cursor.execute("""ALTER TABLE songs ADD COLUMN duplicate boolean
             not null default 0;""")
         setSetting("dbversion", "3")
+      if int(dbversion) < 4:
+        # the chain table should already have been created! no change needed
+        setSetting("dbversion", "4")
     db.commit()
 
 def shutdown():
@@ -399,6 +440,8 @@ def serve():
   lastUpdate = 0
   lastMpd = time.time()
 
+  previoussong = None
+
   log("D Music dir is located at " + str(musicdir))
 
   log("N Ready")
@@ -418,15 +461,16 @@ def serve():
         if clock - lastMpd >= .6:
           lastMpd = clock
           if radioMode:
+            playlist = client.playlistid()
             if client.status()["consume"] == "0":
               cursongid = client.status()["songid"]
-              for song in client.playlistid():
+              for song in playlist:
                 if song["id"] == cursongid:
                   neededlength = int(song["pos"]) + trigger
             else:
               neededlength = trigger
-            if len(client.playlist()) < neededlength:
-              addsong()
+            if len(playlist) < neededlength:
+              addsong(playlist)
               lastMpd = 0
 
           if client.status()['state'] == "play":
@@ -434,12 +478,12 @@ def serve():
             pos = int(times[0])
             end = int(times[1])
             currentsong = client.currentsong()
-            if not armed and "id" in currentsong and not songid == currentsong["id"]:
+            if not armed and "id" in currentsong and previoussong and not previoussong["id"] == currentsong["id"]:
               armed = True
             elif armed and (end > mintime) and (pos > playtime*end/100):
               armed = False # Disarm until the next song
-              listened(currentsong["file"])
-              songid = (currentsong["id"])
+              listened(currentsong, previoussong)
+              previoussong = currentsong
 
       except (KeyError, TypeError):
         pass
