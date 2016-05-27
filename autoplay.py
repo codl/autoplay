@@ -2,8 +2,6 @@
 
 '''
 Keeps your MPD playlist filled with music you like
-
-Dependencies : python-mpd2
 '''
 
 import os
@@ -16,9 +14,9 @@ import sys
 import socket
 
 ## Config
-playtime = 70 # Percentage of a song that must be played before
+playtime = 60 # Percentage of a song that must be played before
               #  play count is incremented
-mintime = 25 # Minimum length of a track for it
+mintime = 20 # Minimum length of a track for it
              #  to be considered a song (in seconds)
 flood_delay = 12*60 # Minutes to wait before adding the same song again
 tries = 10 # Retry connecting this many times
@@ -82,7 +80,7 @@ def addsong(playlist):
             FROM chain
             WHERE prevsong = ?
         )
-    	WHERE NOT duplicate AND time < ?
+        WHERE NOT duplicate AND time < ?
     ),
     maxkarma AS (
       SELECT max(totalkarma) AS maxkarma FROM joined
@@ -571,5 +569,3 @@ if __name__ == "__main__":
 
   s.shutdown(socket.SHUT_RDWR)
   s.close()
-
-# vim: tw=70 ts=2 sw=2
