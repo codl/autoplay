@@ -76,7 +76,7 @@ def addsong(playlist):
       SELECT *, coalesce(karma + chainkarma, karma) as totalkarma
         FROM songs LEFT JOIN
         (
-          SELECT nextsong, karma AS chainkarma
+          SELECT nextsong, karma * 1.2 AS chainkarma
             FROM chain
             WHERE prevsong = ?
         )
