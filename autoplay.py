@@ -95,8 +95,12 @@ def addsong(playlist):
     updateone()
     addsong(playlist)
   else:
-    cursor.execute("UPDATE chain SET karma=karma/2 WHERE nextsong=? AND prevsong=?",
-        (songdata[0], prevsong))
+    if(prevsong):
+      cursor.execute("UPDATE chain SET karma=karma/2 WHERE nextsong=? AND prevsong=?",
+          (songdata[0], prevsong))
+      if cursor.rowcount == 0:
+        cursor.execute("INSERT INTO chain (prevsong, nextsong, karma) VALUES (?, ?, 0)",
+            (prevsong, songdata[0]))
     cursor.execute(
         "UPDATE songs SET added=?, karma=karma/2, time=? WHERE file=?",
         (songdata[2]+1, int(time.time()), songdata[0])
