@@ -20,6 +20,10 @@ mintime = 20 # Minimum length of a track for it
              #  to be considered a song (in seconds)
 flood_delay = 12*60 # Minutes to wait before adding the same song again
 tries = 10 # Retry connecting this many times
+weights = {
+      "played": 1.0,
+      "chain": 1.2
+    }
 ## /Config
 
 version = "3.1.0"
@@ -73,10 +77,10 @@ def addsong(playlist):
     prevsong = playlist[-1]["file"]
   cursor.execute("""
     WITH joined AS (
-      SELECT *, coalesce(karma + chainkarma, karma) as totalkarma
+      SELECT *, coalesce(karma * ? + chainkarma * ?, karma * ?) as totalkarma
         FROM songs LEFT JOIN
         (
-          SELECT nextsong, karma * 1.2 AS chainkarma
+          SELECT nextsong, karma AS chainkarma
             FROM chain
             WHERE prevsong = ?
         )
@@ -89,7 +93,8 @@ def addsong(playlist):
     SELECT file, karma, added, chainkarma FROM joined, maxkarma
       WHERE totalkarma >= maxkarma - 1
       ORDER BY random() LIMIT 1;
-  """, (prevsong, int(time.time()-(60*(flood_delay-trigger*3)))))
+  """, (weights['played'], weights['chain'], weights['played'],
+    prevsong, int(time.time()-(60*(flood_delay-trigger*3)))))
   songdata = cursor.fetchone()
   if not songdata:
     updateone()
