@@ -31,7 +31,7 @@ command can be one of :
 
   start
   stop (synonym: kill)
-  loglevel [debug|notice|warning|error]
+  loglevel [debug|info|notice|warning|error]
   help
   version"""
 
@@ -115,8 +115,8 @@ def addsong(playlist):
     try:
       client.add(songdata[0])
       log("I Added " + songdata[0])
-      log("D A: %s, K: %s -> %s, C: %s" %
-        (songdata[2]+1, songdata[1], songdata[1]/2, songdata[3]))
+      log("D A: %s, K: %0.2f -> %0.2f, C: %0.2f" %
+        (songdata[2]+1, songdata[1], songdata[1]/2, songdata[3] or 0))
     except mpd.CommandError:
       log("W Couldn't add " + songdata[0])
       update(songdata[0])
@@ -145,7 +145,7 @@ def listened(song, prevsong):
             row[0], row[1])
           )
     log("I Listened to " + file)
-    log("D L: %s, K: %s -> %s"
+    log("D L: %s, K: %0.2f -> %0.2f"
         % (songdata[0]+1, songdata[2], songdata[2]+1))
 
     if prevsong:
@@ -390,6 +390,15 @@ def command(command):
       except ValueError:
         ret = '"' + args[1] + '" is not a valid number \n'
     ret += triggerStatus()
+
+  elif args[0] == "loglevel":
+    if len(args) > 1 and args[1][0].lower() in "dnwe":
+      global logLevel
+      logLevel = args[1][0].upper()
+      setSetting("logLevel", logLevel)
+    else:
+      ret = "Valid log levels are: debug, info, notice, warning, error\n"
+
 
   elif args[0] == "info":
     if len(args) > 1:
