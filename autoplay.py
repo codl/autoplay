@@ -80,6 +80,7 @@ def addsong(playlist):
             FROM chain
             WHERE prevsong = ?
         )
+        ON nextsong = file
         WHERE NOT duplicate AND time < ?
     ),
     maxkarma AS (
