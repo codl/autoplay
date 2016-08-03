@@ -189,7 +189,7 @@ def update(song):
 
   inode = dev = None
   duplicate = False
-  listened, added, karma = 0, 0, 5
+  listened, added, karma = 0, 0, 1.5
   if musicdir:
     # Check for duplicate in FS
     try:
@@ -253,7 +253,7 @@ def initDB():
         file text not null,
         listened int not null default 0,
         added int not null default 0,
-        karma real not null default 5,
+        karma real not null default 1.5,
         time int not null default 0,
         inode int,
         dev int,
