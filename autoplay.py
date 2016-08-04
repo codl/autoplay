@@ -18,12 +18,13 @@ playtime = 60 # Percentage of a song that must be played before
               #  play count is incremented
 mintime = 20 # Minimum length of a track for it
              #  to be considered a song (in seconds)
-flood_delay = 12*60 # Minutes to wait before adding the same song again
 tries = 10 # Retry connecting this many times
 weights = {
       "played": 1.0,
-      "chain": 1.2
+      "chain": 1.2,
+      'time': 1.0
     }
+time_base = 60 * 24 # in minutes
 ## /Config
 
 version = "3.1.0"
@@ -70,6 +71,16 @@ def connect(i=1):
   log("N Connected")
 
 
+def sqlite_timekarma(t):
+  return -time_base * 60 /(time.time() - t)
+
+def sqlite_sum_not_null(*values):
+  ret = 0;
+  for value in values:
+    if value:
+      ret += value;
+  return ret
+
 def addsong(playlist):
   """Adds a semi-random song to the playlist"""
   prevsong = None;
@@ -77,7 +88,9 @@ def addsong(playlist):
     prevsong = playlist[-1]["file"]
   cursor.execute("""
     WITH joined AS (
-      SELECT *, coalesce(karma * ? + chainkarma * ?, karma * ?) as totalkarma
+      SELECT *,
+        timekarma(time) as timekarma,
+        sum_not_null(karma * ?, chainkarma * ?, timekarma(time) * ?) AS totalkarma
         FROM songs LEFT JOIN
         (
           SELECT nextsong, karma AS chainkarma
@@ -85,16 +98,16 @@ def addsong(playlist):
             WHERE prevsong = ?
         )
         ON nextsong = file
-        WHERE NOT duplicate AND time < ?
+        WHERE NOT duplicate
     ),
     maxkarma AS (
       SELECT max(totalkarma) AS maxkarma FROM joined
     )
-    SELECT file, karma, added, chainkarma FROM joined, maxkarma
+    SELECT file, karma, added, chainkarma, timekarma, totalkarma, maxkarma - 1 FROM joined, maxkarma
       WHERE totalkarma >= maxkarma - 1
-      ORDER BY random() LIMIT 1;
-  """, (weights['played'], weights['chain'], weights['played'],
-    prevsong, int(time.time()-(60*(flood_delay-trigger*3)))))
+      ORDER BY totalkarma DESC LIMIT 1;
+  """, (weights['played'], weights['chain'], weights['time'],
+    prevsong))
   songdata = cursor.fetchone()
   if not songdata:
     updateone()
@@ -125,8 +138,8 @@ def addsong(playlist):
     try:
       client.add(songdata[0])
       log("I Added " + songdata[0])
-      log("D A: %s, K: %0.2f -> %0.2f, C: %0.2f" %
-        (songdata[2]+1, songdata[1], songdata[1]/2, songdata[3] or 0))
+      log("D A: %s, K: %0.2f -> %0.2f, C: %0.2f, T: %0.2f, Total: %0.2f>%0.2f" %
+        (songdata[2]+1, songdata[1], songdata[1]/2, songdata[3] or 0, songdata[4], songdata[5], songdata[6]))
     except mpd.CommandError:
       log("W Couldn't add " + songdata[0])
       update(songdata[0])
@@ -441,6 +454,8 @@ def serve():
   s.listen(2)
 
   db = sqlite3.connect(datahome+"/db.sqlite")
+  db.create_function("timekarma", 1, sqlite_timekarma)
+  db.create_function("sum_not_null", -1, sqlite_sum_not_null)
   cursor = db.cursor()
   initDB()
 
