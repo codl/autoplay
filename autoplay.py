@@ -117,6 +117,7 @@ def addsong(playlist):
       cursor.execute("UPDATE chain SET karma=karma/2 WHERE nextsong=? AND prevsong=?",
           (songdata[0], prevsong))
       if cursor.rowcount == 0:
+        update(prevsong)
         cursor.execute("INSERT INTO chain (prevsong, nextsong, karma) VALUES (?, ?, 0)",
             (prevsong, songdata[0]))
     cursor.execute(
