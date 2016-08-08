@@ -118,8 +118,13 @@ def addsong(playlist):
           (songdata[0], prevsong))
       if cursor.rowcount == 0:
         update(prevsong)
-        cursor.execute("INSERT INTO chain (prevsong, nextsong, karma) VALUES (?, ?, 0)",
-            (prevsong, songdata[0]))
+        try:
+          cursor.execute("INSERT INTO chain (prevsong, nextsong, karma) VALUES (?, ?, 0)",
+              (prevsong, songdata[0]))
+        except sqlite3.IntegrityError as e:
+          # song is not in the database for some reason,
+          # possibly a remote file
+          pass
     cursor.execute(
         "UPDATE songs SET added=?, karma=karma/2, time=? WHERE file=?",
         (songdata[2]+1, int(time.time()), songdata[0])
