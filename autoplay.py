@@ -24,7 +24,7 @@ weights = {
       "chain": 1.2,
       'time': 1.0
     }
-time_base = 60 * 24 # in minutes
+time_base = 60 * 24 * 14 # in minutes
 ## /Config
 
 version = "3.1.0"
@@ -103,9 +103,9 @@ def addsong(playlist):
     maxkarma AS (
       SELECT max(totalkarma) AS maxkarma FROM joined
     )
-    SELECT file, karma, added, chainkarma, timekarma, totalkarma, maxkarma - 1 FROM joined, maxkarma
-      WHERE totalkarma >= maxkarma - 1
-      ORDER BY totalkarma DESC LIMIT 1;
+    SELECT file, karma, added, chainkarma, timekarma, totalkarma, maxkarma - 0.5 FROM joined, maxkarma
+      WHERE totalkarma >= maxkarma - 0.5
+      ORDER BY random() DESC LIMIT 1;
   """, (weights['played'], weights['chain'], weights['time'],
     prevsong))
   songdata = cursor.fetchone()
