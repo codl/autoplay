@@ -24,7 +24,7 @@ weights = {
       "chain": 1.2,
       'time': 1.0
     }
-time_base = 60 * 24 * 14 # in minutes
+time_base = 60 * 24 * 30 # in minutes
 ## /Config
 
 version = "3.1.0"
@@ -103,8 +103,8 @@ def addsong(playlist):
     maxkarma AS (
       SELECT max(totalkarma) AS maxkarma FROM joined
     )
-    SELECT file, karma, added, chainkarma, timekarma, totalkarma, maxkarma - 0.5 FROM joined, maxkarma
-      WHERE totalkarma >= maxkarma - 0.5
+    SELECT file, karma, added, chainkarma, timekarma, totalkarma, maxkarma * 0.95 FROM joined, maxkarma
+      WHERE totalkarma >= maxkarma * 0.95
       ORDER BY random() DESC LIMIT 1;
   """, (weights['played'], weights['chain'], weights['time'],
     prevsong))
@@ -196,7 +196,7 @@ def listened(song, prevsong):
 allsongs = []
 def updateone():
   if allsongs == []:
-    cursor.execute("VACUUM;")
+    db.execute("VACUUM;")
     for song in client.list("file"):
       allsongs.append(song)
     for song in cursor.execute("SELECT file FROM songs;"):
@@ -248,7 +248,8 @@ def update(song):
         "(file, listened, added, karma, time, inode, dev, duplicate)"+
         "VALUES (?, ?, ?, ?, 0, ?, ?, ?);",
         (song, listened, added, karma, inode, dev, duplicate))
-    db.commit()
+
+  db.commit()
 
 
 def getSetting(name, default=None):
