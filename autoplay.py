@@ -196,7 +196,9 @@ def listened(song, prevsong):
 allsongs = []
 def updateone():
   if allsongs == []:
-    db.execute("VACUUM;")
+    db.isolation_level = None
+    cursor.execute("VACUUM")
+    db.isolation_level = ''
     for song in client.list("file"):
       allsongs.append(song)
     for song in cursor.execute("SELECT file FROM songs;"):
